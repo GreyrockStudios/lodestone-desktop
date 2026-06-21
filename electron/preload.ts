@@ -18,6 +18,9 @@ const api = {
   // App
   appVersion: () => ipcRenderer.invoke('app:version'),
   
+  // Brain
+  scanBrain: () => ipcRenderer.invoke('brain:scan'),
+  
   // Events
   onEngineCrashed: (callback: (data: any) => void) => {
     ipcRenderer.on('lodestone:crashed', (_, data) => callback(data))

@@ -1,8 +1,9 @@
-import { MessageSquare, Brain, Wrench, Clock, User, Settings, FolderOpen, Power } from 'lucide-react'
+import { MessageSquare, Brain, Wrench, Clock, User, Settings, FolderOpen, Power, Network } from 'lucide-react'
 import { useStore } from '../store'
 
 const NAV_ITEMS = [
   { id: 'chat', label: 'Chat', icon: MessageSquare },
+  { id: 'brain', label: 'Brain', icon: Network },
   { id: 'memory', label: 'Memory', icon: Brain },
   { id: 'tools', label: 'Tools', icon: Wrench },
   { id: 'schedule', label: 'Schedule', icon: Clock },

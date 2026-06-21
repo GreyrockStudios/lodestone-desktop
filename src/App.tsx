@@ -7,6 +7,7 @@ import { Tools } from './views/Tools'
 import { Schedule } from './views/Schedule'
 import { Identity } from './views/Identity'
 import { SettingsView } from './views/Settings'
+import { BrainView } from './views/BrainView'
 import { useStore, type AgentConfig } from './store'
 
 export default function App() {
@@ -54,6 +55,7 @@ export default function App() {
       <Sidebar />
       <main className="flex-1 overflow-hidden">
         {activeView === 'chat' && <Chat />}
+        {activeView === 'brain' && <BrainView />}
         {activeView === 'memory' && <Memory />}
         {activeView === 'tools' && <Tools />}
         {activeView === 'schedule' && <Schedule />}

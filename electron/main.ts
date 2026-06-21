@@ -300,6 +300,84 @@ function setupIPC() {
   })
 
   ipcMain.handle('app:version', () => app.getVersion())
+  
+  // Brain view — scan workspace for knowledge graph data
+  ipcMain.handle('brain:scan', async () => {
+    const workspace = getWorkspacePath()
+    const wikiPath = path.join(workspace, 'wiki')
+    const memoryPath = path.join(workspace, 'memory')
+    
+    const nodes: any[] = []
+    let memoryCount = 0
+    let wikiCount = 0
+    let decisionCount = 0
+    
+    // Scan wiki directory
+    if (fs.existsSync(wikiPath)) {
+      const scanDir = (dir: string, type: string) => {
+        if (!fs.existsSync(dir)) return
+        const entries = fs.readdirSync(dir, { withFileTypes: true })
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name)
+          if (entry.isDirectory()) {
+            scanDir(fullPath, type)
+          } else if (entry.name.endsWith('.md')) {
+            const label = entry.name.replace(/\.md$/, '')
+            nodes.push({ id: `${type}-${fullPath}`, label, type, path: fullPath })
+            if (type === 'wiki') wikiCount++
+            if (type === 'decision') decisionCount++
+          }
+        }
+      }
+      scanDir(wikiPath, 'wiki')
+      scanDir(path.join(wikiPath, 'decisions'), 'decision')
+    }
+    
+    // Scan memory directory
+    if (fs.existsSync(memoryPath)) {
+      const scanMemory = (dir: string) => {
+        if (!fs.existsSync(dir)) return
+        const entries = fs.readdirSync(dir, { withFileTypes: true })
+        for (const entry of entries) {
+          if (entry.isDirectory()) {
+            scanMemory(path.join(dir, entry.name))
+          } else if (entry.name.endsWith('.md') || entry.name.endsWith('.json')) {
+            const fullPath = path.join(dir, entry.name)
+            const label = entry.name.replace(/\.(md|json)$/, '')
+            nodes.push({ id: `memory-${fullPath}`, label, type: 'memory', path: fullPath })
+            memoryCount++
+          }
+        }
+      }
+      scanMemory(memoryPath)
+    }
+    
+    // Build connections by scanning wikilinks in file contents
+    for (const node of nodes) {
+      node.connections = []
+      if (node.type === 'wiki' || node.type === 'decision') {
+        try {
+          const content = fs.readFileSync(node.path, 'utf-8')
+          // Find [[wikilinks]]
+          const linkRegex = /\[\[([^\]]+)\]\]/g
+          let match
+          while ((match = linkRegex.exec(content)) !== null) {
+            const linkTarget = match[1]
+            // Find matching node
+            const target = nodes.find(n => n.label === linkTarget || n.label.includes(linkTarget))
+            if (target && target.id !== node.id) {
+              node.connections.push(target.id)
+            }
+          }
+        } catch { /* ignore read errors */ }
+      }
+    }
+    
+    return {
+      nodes,
+      stats: { memoryCount, wikiCount, decisionCount, toolCallCount: 0 },
+    }
+  })
 }
 
 // ---- App lifecycle ----

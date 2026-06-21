@@ -10,6 +10,7 @@ interface LodestoneAPI {
   workspacePath: () => Promise<string>
   openInFinder: () => Promise<boolean>
   appVersion: () => Promise<string>
+  scanBrain: () => Promise<{ nodes: any[]; stats: any }>
   onEngineCrashed: (callback: (data: { code: number }) => void) => void
 }
 
