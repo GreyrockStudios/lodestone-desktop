@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Circle, Clock, Cpu, Database, FileText, Wrench,
-  RefreshCw, AlertCircle, Loader2,
+  RefreshCw, AlertCircle, Loader2, ScrollText, Eye,
 } from 'lucide-react'
 import { useStore, type SocketStatus } from '../store'
 
@@ -302,6 +302,52 @@ export function StatusBar({ onToggleLogViewer, onToggleFileWatcher }: { onToggle
           onClick={() => setActiveView('tools')}
           title="Tool calls — click to open Tools view"
         />
+
+        {/* Log Viewer toggle */}
+        {onToggleLogViewer && (
+          <button
+            onClick={onToggleLogViewer}
+            title="Open Log Viewer"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-dim)',
+              fontSize: 11,
+              lineHeight: 1,
+              fontFamily: 'inherit',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+          >
+            <ScrollText className="w-3 h-3" style={{ opacity: 0.7 }} />
+            <span style={{ opacity: 0.6 }}>Logs</span>
+          </button>
+        )}
+
+        {/* File Watcher toggle */}
+        {onToggleFileWatcher && (
+          <button
+            onClick={onToggleFileWatcher}
+            title="Open File Watcher"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-dim)',
+              fontSize: 11,
+              lineHeight: 1,
+              fontFamily: 'inherit',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+          >
+            <Eye className="w-3 h-3" style={{ opacity: 0.7 }} />
+            <span style={{ opacity: 0.6 }}>Watch</span>
+          </button>
+        )}
 
         {/* Sync indicator */}
         <div className="flex items-center ml-1" style={{ opacity: 0.5 }}>

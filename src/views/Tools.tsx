@@ -233,6 +233,11 @@ export function Tools() {
         </div>
       </div>
 
+      {/* Package Manager */}
+      <div className="px-4 pb-4">
+        <PackageManager />
+      </div>
+
       {/* Tool list */}
       <div className="flex-1 overflow-y-auto p-4">
         <div className="flex flex-col gap-4">

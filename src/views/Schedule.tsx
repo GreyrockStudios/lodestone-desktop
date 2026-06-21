@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Clock, Plus, Trash2, Calendar, Play, Pause, ChevronDown, ChevronRight, Zap } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { CronEditor } from '../components/CronEditor'
 
 interface ScheduledJob {
   id: string
@@ -101,6 +102,11 @@ export function Schedule() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Cron Editor */}
+      <div className="px-4 pb-4">
+        <CronEditor />
       </div>
     </div>
   )

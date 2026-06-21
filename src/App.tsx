@@ -24,6 +24,7 @@ import { SearchAll } from './components/SearchAll'
 import { useStore, type AgentConfig } from './store'
 import { ThemeToggle } from './components/ThemeToggle'
 import { Plug, GitBranch } from 'lucide-react'
+import { MessageSquare } from 'lucide-react'
 import { LogViewer } from './components/LogViewer'
 import { FileWatcher } from './components/FileWatcher'
 import { DeveloperConsole } from './components/DeveloperConsole'
@@ -32,6 +33,9 @@ import { CrashReporter } from './components/CrashReporter'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { QuickStats } from './components/QuickStats'
 import { QuickActions } from './components/QuickActions'
+import { Marketplace } from './views/Marketplace'
+import { FeedbackWidget } from './components/FeedbackWidget'
+import { AnimatePresence } from 'framer-motion'
 
 export default function App() {
   const { hasConfig, setHasConfig, activeView, setConfig, setEngineState, theme, setActiveView } = useStore()
@@ -39,6 +43,7 @@ export default function App() {
   const { searchAllOpen, setSearchAllOpen } = useKeyboardShortcuts()
   const [showLogViewer, setShowLogViewer] = useState(false)
   const [showFileWatcher, setShowFileWatcher] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
 
   // Apply theme to root element
   useEffect(() => {
@@ -135,6 +140,7 @@ export default function App() {
           )}
           {activeView === 'identity' && <Identity />}
           {activeView === 'settings' && <SettingsView />}
+          {activeView === 'marketplace' && <Marketplace />}
         </main>
         <StatusBar onToggleLogViewer={() => setShowLogViewer(true)} onToggleFileWatcher={() => setShowFileWatcher(true)} />
       </div>
@@ -150,6 +156,15 @@ export default function App() {
       <DeveloperConsole />
       <CrashReporter />
       <ShortcutsHelp />
+      <button onClick={() => setShowFeedback(true)}
+        className="fixed rounded-full p-2.5 shadow-lg"
+        style={{ bottom: 44, left: 12, zIndex: 9001, background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--accent)' }}
+        title="Send Feedback">
+        <MessageSquare className="w-4 h-4" />
+      </button>
+      <AnimatePresence>
+        {showFeedback && <FeedbackWidget onClose={() => setShowFeedback(false)} />}
+      </AnimatePresence>
     </div>
   )
 }
