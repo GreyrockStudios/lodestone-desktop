@@ -29,7 +29,7 @@ export function Sidebar() {
   return (
     <div className="w-60 flex flex-col h-full" style={{ background: 'var(--bg-card)', borderRight: '1px solid var(--border)' }}>
       {/* Agent header */}
-      <div className="p-4 border-b" style={{ borderColor: 'var(--border)' }}>
+      <div data-tour-agent-name className="p-4 border-b" style={{ borderColor: 'var(--border)' }}>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #8B5CF6, #06B6D4)' }}>
             <span className="text-sm font-bold text-white">{config?.agentName?.[0]?.toUpperCase() || 'A'}</span>
@@ -52,6 +52,7 @@ export function Sidebar() {
           return (
             <button
               key={item.id}
+              data-tour-nav-item={item.id}
               onClick={() => setActiveView(item.id)}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all mb-1"
               style={{

@@ -251,9 +251,12 @@ function createWindow() {
 }
 
 function createTray() {
-  // Create a simple tray icon
-  const size = 16
-  const icon = nativeImage.createEmpty()
+  // Create tray icon
+  const iconPath = path.join(__dirname, '..', 'build', 'tray-icon.png')
+  let icon = nativeImage.createEmpty()
+  if (fs.existsSync(iconPath)) {
+    icon = nativeImage.createFromPath(iconPath)
+  }
   tray = new Tray(icon)
   
   const contextMenu = Menu.buildFromTemplate([
@@ -275,6 +278,29 @@ function setupIPC() {
     return true
   })
   ipcMain.handle('config:hasWizard', () => hasCompletedWizard())
+
+  ipcMain.handle('config:revealFile', () => {
+    const configPath = getConfigPath()
+    if (fs.existsSync(configPath)) {
+      shell.showItemInFolder(configPath)
+      return true
+    }
+    return false
+  })
+
+  ipcMain.handle('config:reset', () => {
+    stopLodestone()
+    const dataPath = getAppDataPath()
+    try {
+      if (fs.existsSync(dataPath)) {
+        fs.rmSync(dataPath, { recursive: true, force: true })
+      }
+      ensureDirs()
+      return true
+    } catch {
+      return false
+    }
+  })
   
   ipcMain.handle('engine:start', async (_, config: AgentConfig) => {
     try {
@@ -293,12 +319,107 @@ function setupIPC() {
   ipcMain.handle('engine:status', () => {
     return { running: lodestoneProcess !== null, port: lodestonePort }
   })
+
+  ipcMain.handle('engine:uptime', () => {
+    if (lodestoneProcess && engineStartTime) {
+      return Date.now() - engineStartTime
+    }
+    return 0
+  })
   
   ipcMain.handle('workspace:path', () => getWorkspacePath())
   
   ipcMain.handle('workspace:openInFinder', () => {
     shell.openPath(getWorkspacePath())
     return true
+  })
+
+  ipcMain.handle('workspace:exportAll', () => {
+    const dataPath = getAppDataPath()
+    const exportPath = path.join(dataPath, 'exports')
+    if (!fs.existsSync(exportPath)) fs.mkdirSync(exportPath, { recursive: true })
+    const exportFile = path.join(exportPath, `lodestone-export-${Date.now()}.json`)
+    try {
+      const workspace = getWorkspacePath()
+      const config = loadConfig()
+      const exportData: any = {
+        timestamp: new Date().toISOString(),
+        config: config ? { ...config, apiKey: '***REDACTED***' } : null,
+        workspacePath: workspace,
+      }
+      // Collect wiki pages
+      const wikiPath = path.join(workspace, 'wiki')
+      if (fs.existsSync(wikiPath)) {
+        exportData.wiki = []
+        const collectMd = (dir: string) => {
+          if (!fs.existsSync(dir)) return
+          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const fullPath = path.join(dir, entry.name)
+            if (entry.isDirectory()) collectMd(fullPath)
+            else if (entry.name.endsWith('.md')) {
+              exportData.wiki.push({ path: path.relative(workspace, fullPath), content: fs.readFileSync(fullPath, 'utf-8') })
+            }
+          }
+        }
+        collectMd(wikiPath)
+      }
+      // Collect memories
+      const memoryPath = path.join(workspace, 'memory')
+      if (fs.existsSync(memoryPath)) {
+        exportData.memories = []
+        const collectMem = (dir: string) => {
+          if (!fs.existsSync(dir)) return
+          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const fullPath = path.join(dir, entry.name)
+            if (entry.isDirectory()) collectMem(fullPath)
+            else if (entry.name.endsWith('.md') || entry.name.endsWith('.json')) {
+              exportData.memories.push({ path: path.relative(workspace, fullPath), content: fs.readFileSync(fullPath, 'utf-8') })
+            }
+          }
+        }
+        collectMem(memoryPath)
+      }
+      fs.writeFileSync(exportFile, JSON.stringify(exportData, null, 2), 'utf-8')
+      shell.showItemInFolder(exportFile)
+      return exportFile
+    } catch (err) {
+      console.error('[lodestone] export failed:', err)
+      return null
+    }
+  })
+
+  ipcMain.handle('llm:testConnection', async (_, provider: string, apiKey: string, model: string, endpoint?: string) => {
+    try {
+      const url = provider === 'custom' && endpoint
+        ? `${endpoint.replace(/\/$/, '')}/models`
+        : provider === 'openai'
+        ? 'https://api.openai.com/v1/models'
+        : provider === 'anthropic'
+        ? 'https://api.anthropic.com/v1/models'
+        : provider === 'groq'
+        ? 'https://api.groq.com/openai/v1/models'
+        : provider === 'openrouter'
+        ? 'https://openrouter.ai/api/v1/models'
+        : provider === 'ollama-cloud'
+        ? 'https://api.ollama.com/v1/models'
+        : 'https://api.openai.com/v1/models'
+
+      const headers: Record<string, string> = {}
+      if (provider === 'anthropic') {
+        headers['x-api-key'] = apiKey
+        headers['anthropic-version'] = '2023-06-01'
+      } else {
+        headers['Authorization'] = `Bearer ${apiKey}`
+      }
+
+      const res = await fetch(url, { headers, signal: AbortSignal.timeout(10000) })
+      if (res.ok) {
+        return { success: true, message: `Connected successfully (${res.status})` }
+      }
+      return { success: false, message: `HTTP ${res.status}: ${res.statusText}` }
+    } catch (err) {
+      return { success: false, message: (err as Error).message }
+    }
   })
 
   ipcMain.handle('app:version', () => app.getVersion())

@@ -9,10 +9,14 @@ import { Identity } from './views/Identity'
 import { SettingsView } from './views/Settings'
 import { BrainView } from './views/BrainView'
 import { Dashboard } from './views/Dashboard'
+import { History } from './views/History'
+import { Safety } from './views/Safety'
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useStore, type AgentConfig } from './store'
 
 export default function App() {
   const { hasConfig, setHasConfig, activeView, setConfig, setEngineState } = useStore()
+  useKeyboardShortcuts()
 
   useEffect(() => {
     // Check if wizard is completed
@@ -59,8 +63,10 @@ export default function App() {
         {activeView === 'chat' && <Chat />}
         {activeView === 'brain' && <BrainView />}
         {activeView === 'memory' && <Memory />}
+        {activeView === 'history' && <History />}
         {activeView === 'tools' && <Tools />}
         {activeView === 'schedule' && <Schedule />}
+        {activeView === 'safety' && <Safety />}
         {activeView === 'identity' && <Identity />}
         {activeView === 'settings' && <SettingsView />}
       </main>

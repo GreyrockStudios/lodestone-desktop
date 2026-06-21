@@ -27,6 +27,14 @@ interface AppState {
   memoryCount: number
   wikiCount: number
   setMemoryStats: (mem: number, wiki: number) => void
+  
+  // Appearance
+  theme: 'dark' | 'light'
+  setTheme: (t: 'dark' | 'light') => void
+  animationsEnabled: boolean
+  setAnimationsEnabled: (v: boolean) => void
+  streamingEnabled: boolean
+  setStreamingEnabled: (v: boolean) => void
 }
 
 export interface AgentConfig {
@@ -67,4 +75,11 @@ export const useStore = create<AppState>((set) => ({
   memoryCount: 0,
   wikiCount: 0,
   setMemoryStats: (mem, wiki) => set({ memoryCount: mem, wikiCount: wiki }),
+  
+  theme: 'dark',
+  setTheme: (t) => set({ theme: t }),
+  animationsEnabled: true,
+  setAnimationsEnabled: (v) => set({ animationsEnabled: v }),
+  streamingEnabled: true,
+  setStreamingEnabled: (v) => set({ streamingEnabled: v }),
 }))
