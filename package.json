@@ -1,0 +1,40 @@
+{
+  "name": "lodestone-desktop",
+  "version": "0.1.0",
+  "description": "Turn any LLM into a self-improving agent — no terminal required",
+  "author": "Greyrock Studio",
+  "license": "MIT",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && electron-builder",
+    "build:mac": "tsc --noEmit && vite build && electron-builder --mac",
+    "build:win": "tsc --noEmit && vite build && electron-builder --win",
+    "build:linux": "tsc --noEmit && vite build && electron-builder --linux",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "lucide-react": "^0.460.0",
+    "framer-motion": "^11.15.0",
+    "zustand": "^5.0.2",
+    "socket.io-client": "^4.8.1",
+    "clsx": "^2.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.5",
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "autoprefixer": "^10.4.20"
+  }
+}
