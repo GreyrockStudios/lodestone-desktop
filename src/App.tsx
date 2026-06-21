@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Wizard } from './components/Wizard'
 import { Sidebar } from './components/Sidebar'
+import { WelcomeTour, shouldShowTour } from './components/WelcomeTour'
 import { Chat } from './views/Chat'
 import { Memory } from './views/Memory'
 import { Tools } from './views/Tools'
@@ -16,6 +17,7 @@ import { useStore, type AgentConfig } from './store'
 
 export default function App() {
   const { hasConfig, setHasConfig, activeView, setConfig, setEngineState } = useStore()
+  const [showTour, setShowTour] = useState(false)
   useKeyboardShortcuts()
 
   useEffect(() => {
@@ -34,6 +36,11 @@ export default function App() {
             })
           }
         })
+        // Show tour on first visit to Dashboard after wizard completion
+        if (shouldShowTour()) {
+          // Small delay to let the UI render before measuring targets
+          setTimeout(() => setShowTour(true), 600)
+        }
       }
     })
 
@@ -70,6 +77,9 @@ export default function App() {
         {activeView === 'identity' && <Identity />}
         {activeView === 'settings' && <SettingsView />}
       </main>
+      {showTour && (
+        <WelcomeTour onComplete={() => setShowTour(false)} />
+      )}
     </div>
   )
 }
