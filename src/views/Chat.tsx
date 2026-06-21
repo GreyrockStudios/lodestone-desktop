@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Send, Sparkles, Copy, Pin, Download, Activity as ActivityIcon, ChevronUp, ChevronDown, Paperclip, X, FileText, Image as ImageIcon } from 'lucide-react'
+import { Send, Sparkles, Copy, Pin, Download, Activity as ActivityIcon, ChevronUp, ChevronDown, Paperclip, X, FileText, Image as ImageIcon, Mic, FileDown } from 'lucide-react'
 import { useStore, type ChatMessage } from '../store'
 import { io, Socket } from 'socket.io-client'
 import { marked } from 'marked'
@@ -388,6 +388,26 @@ export function Chat() {
     URL.revokeObjectURL(url)
   }, [])
 
+  const handleExportConversation = useCallback(() => {
+    const md = messages.map(m => {
+      const role = m.role === 'user' ? '**You**' : m.role === 'assistant' ? `**${config?.agentName || 'Agent'}**` : '*System*'
+      return `### ${role} — ${new Date(m.timestamp).toLocaleString()}\n\n${m.content}\n`
+    }).join('\n---\n\n')
+    const header = `# Conversation with ${config?.agentName || 'Agent'}\n# ${new Date().toLocaleString()}\n\n`
+    const blob = new Blob([header + md], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `conversation-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [messages, config])
+
+  const handleMicClick = useCallback(() => {
+    // TODO: wire to Web Speech API or Whisper
+    console.log('Mic clicked — voice input not yet wired')
+  }, [])
+
   // Sorted: pinned first, then by time
   const sortedMessages = useMemo(() => {
     const pinned = messages.filter((m) => pinnedIds.has(m.id))
@@ -441,22 +461,42 @@ export function Chat() {
             Chat with {config?.agentName || 'your agent'}
           </h2>
         </div>
-        <button
-          onClick={() => setShowActivity((v) => !v)}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all"
-          style={{
-            background: showActivity ? 'var(--bg-elevated)' : 'transparent',
-            border: `1px solid ${showActivity ? 'var(--border)' : 'transparent'}`,
-            color: showActivity ? 'var(--accent)' : 'var(--text-muted)',
-            fontSize: 12,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-          }}
-        >
-          <ActivityIcon className="w-3.5 h-3.5" />
-          <span>Activity</span>
-          {showActivity ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleExportConversation}
+            disabled={messages.length === 0}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all"
+            style={{
+              background: 'transparent',
+              border: '1px solid transparent',
+              color: 'var(--text-muted)',
+              fontSize: 12,
+              cursor: messages.length > 0 ? 'pointer' : 'not-allowed',
+              opacity: messages.length > 0 ? 1 : 0.4,
+              fontFamily: 'inherit',
+            }}
+            title="Export conversation as Markdown"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            <span>Export</span>
+          </button>
+          <button
+            onClick={() => setShowActivity((v) => !v)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all"
+            style={{
+              background: showActivity ? 'var(--bg-elevated)' : 'transparent',
+              border: `1px solid ${showActivity ? 'var(--border)' : 'transparent'}`,
+              color: showActivity ? 'var(--accent)' : 'var(--text-muted)',
+              fontSize: 12,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            <ActivityIcon className="w-3.5 h-3.5" />
+            <span>Activity</span>
+            {showActivity ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -538,6 +578,14 @@ export function Chat() {
               title="Attach files"
             >
               <Paperclip className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+            </button>
+            <button
+              onClick={handleMicClick}
+              className="w-11 h-11 rounded-xl flex items-center justify-center transition-all flex-shrink-0"
+              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
+              title="Voice input"
+            >
+              <Mic className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
             </button>
             <textarea
             ref={textareaRef}
