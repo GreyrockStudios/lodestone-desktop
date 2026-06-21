@@ -22,7 +22,7 @@
   "dependencies": {
     "clsx": "^2.1.1",
     "framer-motion": "^11.15.0",
-    "lodestone": "^0.1.0",
+    "lodestone": "file:../../../Users/flint/.openclaw/workspace/projects/lodestone",
     "lucide-react": "^0.460.0",
     "marked": "^18.0.5",
     "react": "^19.0.0",
