@@ -1,6 +1,15 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BarChart3, ChevronDown, X, TrendingUp, Clock, Wrench, Hash, Activity } from 'lucide-react'
+import { useStore } from '../store'
+
+// ─── Store hook (lightweight subscription) ────────────────────────────
+
+function useStoreState() {
+  const messages = useStore(s => s.messages)
+  const totalTokens = useStore(s => s.totalTokens)
+  return { messages, totalTokens }
+}
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -83,7 +92,6 @@ function StatRow({
 }
 
 // ─── Quick Stats Widget ──────────────────────────────────────────────
-
 export function QuickStats() {
   const [expanded, setExpanded] = useState(false)
   const [visible, setVisible] = useState(true)
@@ -98,9 +106,6 @@ export function QuickStats() {
 
   // Track messages from store
   const { messages, totalTokens } = useStoreState()
-
-  // Track tool calls
-  const toolCallsRef = useRef(0)
 
   useEffect(() => {
     // Count new messages from user as "messages sent"
@@ -302,14 +307,4 @@ export function QuickStats() {
       </AnimatePresence>
     </div>
   )
-}
-
-// ─── Store hook (lightweight subscription) ────────────────────────────
-
-import { useStore } from '../store'
-
-function useStoreState() {
-  const messages = useStore(s => s.messages)
-  const totalTokens = useStore(s => s.totalTokens)
-  return { messages, totalTokens }
 }

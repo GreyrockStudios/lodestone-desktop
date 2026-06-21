@@ -26,7 +26,6 @@ import { DeveloperConsole } from './components/DeveloperConsole'
 import { UpdateChecker } from './components/UpdateChecker'
 import { CrashReporter } from './components/CrashReporter'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
-import { AgentHealth } from './components/AgentHealth'
 import { QuickStats } from './components/QuickStats'
 
 export default function App() {

@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Cpu, MemoryStick, Clock, AlertCircle, Zap } from 'lucide-react'
+import { useStore } from '../store'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -120,43 +121,43 @@ export function AgentHealth() {
     errorCount: 0,
     uptime: 0,
   })
-
-  const updateMetrics = useCallback(async () => {
-    // Try to read crash log count
-    let errorCount = 0
-    try {
-      // Attempt to fetch from engine health endpoint
-      const port = useStore.getState().enginePort
-      if (port) {
-        const res = await fetch(`http://localhost:${port}/api/health`)
-        if (res.ok) {
-          const data = await res.json()
-          errorCount = data.errorCount ?? data.errorsToday ?? 0
-        }
-      }
-    } catch {
-      // Keep last value
-      errorCount = metrics.errorCount
-    }
-
-    setMetrics({
-      cpu: randomBetween(5, 15),
-      memory: randomBetween(120, 180),
-      responseTime: randomBetween(200, 800),
-      errorCount,
-      uptime: metrics.uptime + 5,
-    })
-  }, [metrics.errorCount, metrics.uptime])
+  const metricsRef = useRef(metrics)
+  metricsRef.current = metrics
 
   useEffect(() => {
     // Initial uptime from engine
     window.lodestone?.engineUptime?.()?.then?.((ms: number) => {
       setMetrics(prev => ({ ...prev, uptime: Math.floor(ms / 1000) }))
     })?.catch?.(() => {})
+  }, [])
 
-    const interval = setInterval(updateMetrics, 5000)
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      // Try to read error count from engine health endpoint
+      let errorCount = metricsRef.current.errorCount
+      try {
+        const port = useStore.getState().enginePort
+        if (port) {
+          const res = await fetch(`http://localhost:${port}/api/health`)
+          if (res.ok) {
+            const data = await res.json()
+            errorCount = data.errorCount ?? data.errorsToday ?? 0
+          }
+        }
+      } catch {
+        // Keep last value
+      }
+
+      setMetrics(prev => ({
+        cpu: randomBetween(5, 15),
+        memory: randomBetween(120, 180),
+        responseTime: randomBetween(200, 800),
+        errorCount,
+        uptime: prev.uptime + 5,
+      }))
+    }, 5000)
     return () => clearInterval(interval)
-  }, [updateMetrics])
+  }, [])
 
   const cpuStatus = getStatus(metrics.cpu, [10, 13])
   const memStatus = getStatus(metrics.memory, [150, 170])
@@ -212,7 +213,3 @@ export function AgentHealth() {
     </div>
   )
 }
-
-// ─── Import store for engine port ─────────────────────────────────────
-
-import { useStore } from '../store'

@@ -6,6 +6,7 @@ import { marked } from 'marked'
 import { ActivityFeed, type ActivityEntry } from '../components/ActivityFeed'
 import { ToolExecutionModal } from '../components/ToolExecutionModal'
 import { MessageTemplates } from '../components/MessageTemplates'
+import { ToolMonitor, useMockToolMonitor } from '../components/ToolMonitor'
 import { useVoiceInput } from '../hooks/useVoiceInput'
 
 marked.setOptions({ breaks: true, gfm: true })
@@ -392,6 +393,7 @@ export function Chat() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [showActivity, setShowActivity] = useState(false)
+  const [showToolMonitor, setShowToolMonitor] = useState(false)
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set())
   const [showPinnedPanel, setShowPinnedPanel] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -412,7 +414,6 @@ export function Chat() {
   const [branches, setBranches] = useState<Map<string, ChatMessage[]>>(new Map())
   const [activeBranchId, setActiveBranchId] = useState<string | null>(null)
   // When in a branch, show messages from branches.get(activeBranchId), else from store
-  const [mainMessagesSnapshot, setMainMessagesSnapshot] = useState<ChatMessage[]>([])
 
   // Ref to always have current activeBranchId in socket handlers
   const activeBranchIdRef = useRef<string | null>(null)
@@ -432,6 +433,7 @@ export function Chat() {
   )
 
   const mockActivity = useMemo(() => generateMockActivity(), [])
+  const { entries: toolMonitorEntries, clear: clearToolMonitor } = useMockToolMonitor(6000)
 
   // Connect to engine via Socket.IO
   useEffect(() => {
@@ -690,8 +692,6 @@ export function Chat() {
       next.set(branchId, [...branchedMessages])
       return next
     })
-    // Save main messages to restore later
-    setMainMessagesSnapshot(messages)
     setActiveBranchId(branchId)
     setToast(`Branched from message #${branchPoint + 1}`)
   }, [messages])
@@ -946,6 +946,21 @@ export function Chat() {
               <span>Export</span>
             </button>
             <button
+              onClick={() => setShowToolMonitor((v) => !v)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all"
+              style={{
+                background: showToolMonitor ? 'var(--bg-elevated)' : 'transparent',
+                border: `1px solid ${showToolMonitor ? 'var(--border)' : 'transparent'}`,
+                color: showToolMonitor ? '#06B6D4' : 'var(--text-muted)',
+                fontSize: 12,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              <ActivityIcon className="w-3.5 h-3.5" />
+              <span>Tools</span>
+            </button>
+            <button
               onClick={() => setShowActivity((v) => !v)}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all"
               style={{
@@ -1102,6 +1117,11 @@ export function Chat() {
         {/* Activity Feed */}
         {showActivity && (
           <ActivityFeed entries={mockActivity} onClear={() => {}} />
+        )}
+
+        {/* Tool Monitor */}
+        {showToolMonitor && (
+          <ToolMonitor entries={toolMonitorEntries} onClear={clearToolMonitor} />
         )}
 
         {/* Input */}
