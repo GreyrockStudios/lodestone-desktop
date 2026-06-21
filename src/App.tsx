@@ -17,11 +17,17 @@ import { CommandPalette } from './components/CommandPalette'
 import { StatusBar } from './components/StatusBar'
 import { SearchAll } from './components/SearchAll'
 import { useStore, type AgentConfig } from './store'
+import { ThemeToggle } from './components/ThemeToggle'
 
 export default function App() {
-  const { hasConfig, setHasConfig, activeView, setConfig, setEngineState } = useStore()
+  const { hasConfig, setHasConfig, activeView, setConfig, setEngineState, theme } = useStore()
   const [showTour, setShowTour] = useState(false)
   const { searchAllOpen, setSearchAllOpen } = useKeyboardShortcuts()
+
+  // Apply theme to root element
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
 
   useEffect(() => {
     // Check if wizard is completed
@@ -68,7 +74,10 @@ export default function App() {
   return (
     <div className="flex h-screen w-screen overflow-hidden">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        <div className="absolute top-3 right-3 z-50">
+          <ThemeToggle />
+        </div>
         <main className="flex-1 overflow-hidden">
           {activeView === 'dashboard' && <Dashboard />}
           {activeView === 'chat' && <Chat />}

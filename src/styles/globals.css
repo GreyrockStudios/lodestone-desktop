@@ -13,7 +13,7 @@
   --color-text-dim: #6B7280
 }
 
-:root {
+:root, [data-theme="dark"] {
   --bg: #0A0A0F;
   --bg-card: #12121A;
   --bg-elevated: #1A1A2E;
@@ -24,6 +24,19 @@
   --text: #E5E5E5;
   --text-muted: #9CA3AF;
   --text-dim: #6B7280;
+}
+
+[data-theme="light"] {
+  --bg: #FAFAFA;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #F3F4F6;
+  --border: #E5E7EB;
+  --border-hover: #D1D5DB;
+  --accent: #7C3AED;
+  --accent-cyan: #0891B2;
+  --text: #111827;
+  --text-muted: #4B5563;
+  --text-dim: #9CA3AF;
 }
 
 * {

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Send, Sparkles, Copy, Pin, Download, Activity as ActivityIcon, ChevronUp, ChevronDown } from 'lucide-react'
+import { Send, Sparkles, Copy, Pin, Download, Activity as ActivityIcon, ChevronUp, ChevronDown, Paperclip, X, FileText, Image as ImageIcon } from 'lucide-react'
 import { useStore, type ChatMessage } from '../store'
 import { io, Socket } from 'socket.io-client'
 import { marked } from 'marked'
@@ -193,6 +193,9 @@ export function Chat() {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [showActivity, setShowActivity] = useState(false)
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set())
+  const [isDragging, setIsDragging] = useState(false)
+  const [attachments, setAttachments] = useState<File[]>([])
+  const dragCounter = useRef(0)
 
   const mockActivity = useMemo(() => generateMockActivity(), [])
 
@@ -282,19 +285,74 @@ export function Chat() {
     el.style.height = Math.min(el.scrollHeight, maxHeight) + 'px'
   }, [input])
 
+  // Drag and drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current++
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true)
+    }
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current--
+    if (dragCounter.current === 0) {
+      setIsDragging(false)
+    }
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current = 0
+    setIsDragging(false)
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length > 0) {
+      setAttachments((prev) => [...prev, ...files])
+    }
+  }, [])
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length > 0) {
+      setAttachments((prev) => [...prev, ...files])
+    }
+    e.target.value = ''
+  }, [])
+
+  const removeAttachment = useCallback((idx: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== idx))
+  }, [])
+
   const handleSend = () => {
-    if (!input.trim() || !socketRef.current) return
+    if ((!input.trim() && attachments.length === 0) || !socketRef.current) return
     setSending(true)
+
+    // Build message with attachment info
+    let content = input.trim()
+    if (attachments.length > 0) {
+      const fileList = attachments.map(f => `[Attached: ${f.name} (${(f.size / 1024).toFixed(1)}KB)]`).join('\n')
+      content = content ? `${content}\n${fileList}` : fileList
+    }
 
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: input.trim(),
+      content,
       timestamp: Date.now(),
     }
     addMessage(msg)
-    socketRef.current.emit('message', { content: input.trim() })
+    socketRef.current.emit('message', { content })
     setInput('')
+    setAttachments([])
   }
 
   // Context menu handlers
@@ -352,7 +410,27 @@ export function Chat() {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full" style={{ background: 'var(--bg)' }}>
+    <div
+      className="flex-1 flex flex-col h-full relative"
+      style={{ background: 'var(--bg)' }}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDragging && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(139, 92, 246, 0.1)', backdropFilter: 'blur(4px)' }}
+        >
+          <div className="text-center" style={{ background: 'var(--bg-card)', border: '2px dashed var(--accent)', borderRadius: 16, padding: '32px 48px' }}>
+            <Paperclip className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--accent)' }} />
+            <p className="text-base font-medium" style={{ color: 'var(--text)' }}>Drop files to attach</p>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>PDF, images, code, text files</p>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div
         className="flex items-center justify-between px-6 py-2 border-b"
@@ -430,8 +508,38 @@ export function Chat() {
 
       {/* Input */}
       <div className="p-4 border-t" style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}>
-        <div className="max-w-3xl mx-auto flex items-end gap-2">
-          <textarea
+        <div className="max-w-3xl mx-auto">
+          {/* Attachments bar */}
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {attachments.map((file, idx) => (
+                <div key={idx} className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+                  {file.type.startsWith('image/') ? (
+                    <ImageIcon className="w-3.5 h-3.5" style={{ color: '#06B6D4' }} />
+                  ) : (
+                    <FileText className="w-3.5 h-3.5" style={{ color: '#A78BFA' }} />
+                  )}
+                  <span className="text-xs" style={{ color: 'var(--text)' }}>{file.name}</span>
+                  <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{(file.size / 1024).toFixed(0)}KB</span>
+                  <button onClick={() => removeAttachment(idx)} className="p-0.5 rounded hover:bg-red-500/10">
+                    <X className="w-3 h-3" style={{ color: '#EF4444' }} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <div className="flex items-end gap-2">
+            <input type="file" multiple onChange={handleFileSelect} style={{ display: 'none' }} id="file-input" />
+            <button
+              onClick={() => document.getElementById('file-input')?.click()}
+              className="w-11 h-11 rounded-xl flex items-center justify-center transition-all flex-shrink-0"
+              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
+              title="Attach files"
+            >
+              <Paperclip className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+            </button>
+            <textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -455,16 +563,17 @@ export function Chat() {
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || sending}
+            disabled={(!input.trim() && attachments.length === 0) || sending}
             className="w-11 h-11 rounded-xl flex items-center justify-center transition-all flex-shrink-0"
             style={{
-              background: input.trim() ? 'linear-gradient(135deg, #8B5CF6, #7C3AED)' : 'var(--bg-elevated)',
+              background: (input.trim() || attachments.length > 0) ? "linear-gradient(135deg, #8B5CF6, #7C3AED)" : "var(--bg-elevated)",
               border: 'none',
-              cursor: input.trim() && !sending ? 'pointer' : 'not-allowed',
+              cursor: ((input.trim() || attachments.length > 0) && !sending) ? 'pointer' : 'not-allowed',
             }}
           >
-            <Send className="w-4 h-4" style={{ color: input.trim() ? 'white' : 'var(--text-dim)' }} />
+            <Send className="w-4 h-4" style={{ color: (input.trim() || attachments.length > 0) ? 'white' : 'var(--text-dim)' }} />
           </button>
+          </div>
         </div>
       </div>
 
