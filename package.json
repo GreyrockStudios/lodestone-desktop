@@ -4,6 +4,11 @@
   "description": "Turn any LLM into a self-improving agent — no terminal required",
   "author": "Greyrock Studio",
   "license": "MIT",
+  "homepage": "https://lodestone.greyrockstudios.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GreyrockStudios/lodestone-desktop.git"
+  },
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",

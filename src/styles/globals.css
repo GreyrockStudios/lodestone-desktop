@@ -179,3 +179,9 @@ input:focus, textarea:focus, select:focus {
 }
 .prose-chat th { background: var(--bg-elevated); font-weight: 600; }
 .prose-chat hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+
+/* Notification animations */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(100px); }
+  to { opacity: 1; transform: translateX(0); }
+}
