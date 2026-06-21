@@ -4,7 +4,7 @@ import { useStore } from '../store'
 /**
  * Global keyboard shortcuts for the app.
  * Cmd/Ctrl+1-9 switches between views.
- * Cmd/Ctrl+K opens command palette (future).
+ * Cmd/Ctrl+K opens command palette (handled in CommandPalette component).
  * Cmd/Ctrl+, opens settings.
  * Cmd/Ctrl+N starts new chat.
  */

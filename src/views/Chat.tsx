@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from 'react'
 import { Send, Loader2, Sparkles } from 'lucide-react'
 import { useStore, type ChatMessage } from '../store'
 import { io, Socket } from 'socket.io-client'
+import { marked } from 'marked'
+
+marked.setOptions({ breaks: true, gfm: true })
 
 export function Chat() {
   const { messages, addMessage, engineRunning, enginePort, config } = useStore()
@@ -143,11 +146,10 @@ export function Chat() {
             {streamingText && (
               <div className="flex justify-start">
                 <div
-                  className="max-w-[80%] px-4 py-3 rounded-2xl text-sm opacity-80"
+                  className="max-w-[80%] px-4 py-3 rounded-2xl text-sm opacity-80 prose-chat"
                   style={{ background: 'var(--bg-card)', color: 'var(--text)', border: '1px solid var(--border)' }}
-                >
-                  {streamingText}
-                </div>
+                  dangerouslySetInnerHTML={{ __html: marked.parse(streamingText) as string }}
+                />
               </div>
             )}
             {sending && !streamingText && (
@@ -224,7 +226,14 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
           border: isUser ? 'none' : '1px solid var(--border)',
         }}
       >
-        <div className="whitespace-pre-wrap">{msg.content}</div>
+        {isUser ? (
+          <div className="whitespace-pre-wrap">{msg.content}</div>
+        ) : (
+          <div
+            className="prose-chat"
+            dangerouslySetInnerHTML={{ __html: marked.parse(msg.content) as string }}
+          />
+        )}
         {msg.tools && msg.tools.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {msg.tools.map(t => (

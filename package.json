@@ -15,27 +15,28 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.15.0",
+    "lodestone": "^0.1.0",
+    "lucide-react": "^0.460.0",
+    "marked": "^18.0.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "lucide-react": "^0.460.0",
-    "framer-motion": "^11.15.0",
-    "zustand": "^5.0.2",
     "socket.io-client": "^4.8.1",
-    "clsx": "^2.1.1",
-    "lodestone": "^0.1.0"
+    "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
+    "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.5",
     "vite-plugin-electron": "^0.29.0",
-    "vite-plugin-electron-renderer": "^0.14.5",
-    "tailwindcss": "^4.0.0",
-    "@tailwindcss/vite": "^4.0.0",
-    "autoprefixer": "^10.4.20"
+    "vite-plugin-electron-renderer": "^0.14.5"
   }
 }

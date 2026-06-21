@@ -13,6 +13,8 @@ import { Dashboard } from './views/Dashboard'
 import { History } from './views/History'
 import { Safety } from './views/Safety'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import { CommandPalette } from './components/CommandPalette'
+import { StatusBar } from './components/StatusBar'
 import { useStore, type AgentConfig } from './store'
 
 export default function App() {
@@ -65,21 +67,25 @@ export default function App() {
   return (
     <div className="flex h-screen w-screen overflow-hidden">
       <Sidebar />
-      <main className="flex-1 overflow-hidden">
-        {activeView === 'dashboard' && <Dashboard />}
-        {activeView === 'chat' && <Chat />}
-        {activeView === 'brain' && <BrainView />}
-        {activeView === 'memory' && <Memory />}
-        {activeView === 'history' && <History />}
-        {activeView === 'tools' && <Tools />}
-        {activeView === 'schedule' && <Schedule />}
-        {activeView === 'safety' && <Safety />}
-        {activeView === 'identity' && <Identity />}
-        {activeView === 'settings' && <SettingsView />}
-      </main>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <main className="flex-1 overflow-hidden">
+          {activeView === 'dashboard' && <Dashboard />}
+          {activeView === 'chat' && <Chat />}
+          {activeView === 'brain' && <BrainView />}
+          {activeView === 'memory' && <Memory />}
+          {activeView === 'history' && <History />}
+          {activeView === 'tools' && <Tools />}
+          {activeView === 'schedule' && <Schedule />}
+          {activeView === 'safety' && <Safety />}
+          {activeView === 'identity' && <Identity />}
+          {activeView === 'settings' && <SettingsView />}
+        </main>
+        <StatusBar />
+      </div>
       {showTour && (
         <WelcomeTour onComplete={() => setShowTour(false)} />
       )}
+      <CommandPalette />
     </div>
   )
 }
