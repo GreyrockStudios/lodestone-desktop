@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Circle, Clock, Cpu, Database, FileText, Wrench,
-  RefreshCw, AlertCircle, Loader2, ScrollText, Eye,
+  RefreshCw, AlertCircle, Loader2, ScrollText, Eye, Activity,
 } from 'lucide-react'
 import { useStore, type SocketStatus } from '../store'
 
@@ -139,7 +139,7 @@ function Badge({
 
 // ─── StatusBar ───────────────────────────────────────────────────────
 
-export function StatusBar({ onToggleLogViewer, onToggleFileWatcher }: { onToggleLogViewer?: () => void; onToggleFileWatcher?: () => void }) {
+export function StatusBar({ onToggleLogViewer, onToggleFileWatcher, onToggleProfiler }: { onToggleLogViewer?: () => void; onToggleFileWatcher?: () => void; onToggleProfiler?: () => void }) {
   const { engineRunning, enginePort, config, setActiveView, socketStatus, inputTokens, totalTokens } = useStore()
   const [uptime, setUptime] = useState(0)
   const [stats, setStats] = useState<DashboardStats | null>(null)
@@ -346,6 +346,29 @@ export function StatusBar({ onToggleLogViewer, onToggleFileWatcher }: { onToggle
           >
             <Eye className="w-3 h-3" style={{ opacity: 0.7 }} />
             <span style={{ opacity: 0.6 }}>Watch</span>
+          </button>
+        )}
+
+        {/* Profiler toggle */}
+        {onToggleProfiler && (
+          <button
+            onClick={onToggleProfiler}
+            title="Toggle Performance Profiler"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-dim)',
+              fontSize: 11,
+              lineHeight: 1,
+              fontFamily: 'inherit',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+          >
+            <Activity className="w-3 h-3" style={{ opacity: 0.7 }} />
+            <span style={{ opacity: 0.6 }}>Profile</span>
           </button>
         )}
 

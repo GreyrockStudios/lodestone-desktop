@@ -33,7 +33,14 @@ import { CrashReporter } from './components/CrashReporter'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { QuickStats } from './components/QuickStats'
 import { QuickActions } from './components/QuickActions'
+import { Vault } from './components/Vault'
+import { NotificationCenter } from './components/NotificationCenter'
+import { ApiPlayground } from './components/ApiPlayground'
+import { PerformanceProfiler } from './components/PerformanceProfiler'
 import { Marketplace } from './views/Marketplace'
+import { MetricsView } from './views/MetricsView'
+import { PlaygroundView } from './views/PlaygroundView'
+import { AutomationView } from './views/AutomationView'
 import { FeedbackWidget } from './components/FeedbackWidget'
 import { AnimatePresence } from 'framer-motion'
 
@@ -44,6 +51,7 @@ export default function App() {
   const [showLogViewer, setShowLogViewer] = useState(false)
   const [showFileWatcher, setShowFileWatcher] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
+  const [showProfiler, setShowProfiler] = useState(false)
 
   // Apply theme to root element
   useEffect(() => {
@@ -139,10 +147,16 @@ export default function App() {
             </div>
           )}
           {activeView === 'identity' && <Identity />}
+          {activeView === 'vault' && <Vault />}
+          {activeView === 'notifications' && <NotificationCenter />}
+          {activeView === 'api-playground' && <ApiPlayground />}
           {activeView === 'settings' && <SettingsView />}
           {activeView === 'marketplace' && <Marketplace />}
+          {activeView === 'metrics' && <MetricsView />}
+          {activeView === 'playground' && <PlaygroundView />}
+          {activeView === 'automations' && <AutomationView />}
         </main>
-        <StatusBar onToggleLogViewer={() => setShowLogViewer(true)} onToggleFileWatcher={() => setShowFileWatcher(true)} />
+        <StatusBar onToggleLogViewer={() => setShowLogViewer(true)} onToggleFileWatcher={() => setShowFileWatcher(true)} onToggleProfiler={() => setShowProfiler(!showProfiler)} />
       </div>
       <QuickStats />
       <QuickActions onNavigate={(v) => setActiveView(v)} />
@@ -156,6 +170,7 @@ export default function App() {
       <DeveloperConsole />
       <CrashReporter />
       <ShortcutsHelp />
+      {showProfiler && <PerformanceProfiler onClose={() => setShowProfiler(false)} />}
       <button onClick={() => setShowFeedback(true)}
         className="fixed rounded-full p-2.5 shadow-lg"
         style={{ bottom: 44, left: 12, zIndex: 9001, background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--accent)' }}

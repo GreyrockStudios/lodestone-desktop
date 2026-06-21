@@ -31,6 +31,7 @@ import { useStore, type AgentConfig } from '../store'
 import { ModelComparison } from '../components/ModelComparison'
 import { CapabilitiesMatrix } from '../components/CapabilitiesMatrix'
 import { EnvManager } from '../components/EnvManager'
+import { BackupManager } from '../components/BackupManager'
 
 export function SettingsView() {
   const {

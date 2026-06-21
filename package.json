@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "clsx": "^2.1.1",
+    "electron-updater": "^6.8.9",
     "framer-motion": "^11.15.0",
     "lodestone": "file:../../../Users/flint/.openclaw/workspace/projects/lodestone",
     "lucide-react": "^0.460.0",

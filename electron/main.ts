@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import * as path from 'path'
 import { spawn, ChildProcess } from 'child_process'
 import * as fs from 'fs'
@@ -545,6 +546,32 @@ function setupIPC() {
   })
 
   ipcMain.handle('app:version', () => app.getVersion())
+
+  // Manual update check
+  ipcMain.handle('update:check', async () => {
+    try {
+      const result = await autoUpdater.checkForUpdates()
+      if (result && result.updateInfo) {
+        const current = app.getVersion()
+        const latest = (result.updateInfo.version || '').replace(/^v/, '')
+        return { available: latest !== current, version: latest, current }
+      }
+      return { available: false, current: app.getVersion() }
+    } catch (err: any) {
+      return { available: false, error: err.message, current: app.getVersion() }
+    }
+  })
+
+  // Install downloaded update
+  ipcMain.handle('update:install', () => {
+    autoUpdater.quitAndInstall()
+    return { success: true }
+  })
+
+  // Get download progress
+  ipcMain.handle('update:progress', () => {
+    return { downloading: false, percent: 0 }  // Placeholder; real progress via events
+  })
   
   // Crash Reporter — append to ~/.lodestone/crash-log.txt
   ipcMain.handle('crash:writeLog', (_, message: string) => {
@@ -1108,6 +1135,69 @@ app.whenReady().then(() => {
   setupIPC()
   createWindow()
   createTray()
+
+  // ─── Auto-Updater ──────────────────────────────────────────
+  // Configure electron-updater for automatic background updates.
+  // Checks GitHub releases for new versions. Downloads in background,
+  // installs on next restart (or silently if checkForUpdatesAndNotify).
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.allowPrerelease = false
+
+  // Feed URL: GitHub releases from GreyrockStudios/lodestone-desktop
+  // electron-updater reads latest.yml (mac) from releases assets.
+  // For dev/unpublished builds, this silently fails — that's fine.
+  autoUpdater.setFeedURL({
+    provider: 'github',
+    owner: 'GreyrockStudios',
+    repo: 'lodestone-desktop',
+  })
+
+  // Events
+  autoUpdater.on('update-available', (info: any) => {
+    mainWindow?.webContents.send('update:available', {
+      version: info.version || 'unknown',
+      releaseDate: info.releaseDate || '',
+    })
+  })
+
+  autoUpdater.on('update-not-available', () => {
+    mainWindow?.webContents.send('update:not-available')
+  })
+
+  autoUpdater.on('download-progress', (progress: any) => {
+    mainWindow?.webContents.send('update:progress', {
+      percent: Math.round(progress.percent),
+      transferred: progress.transferred,
+      total: progress.total,
+      speed: progress.bytesPerSecond,
+    })
+  })
+
+  autoUpdater.on('update-downloaded', (info: any) => {
+    mainWindow?.webContents.send('update:downloaded', {
+      version: info.version || 'unknown',
+    })
+    // Auto-quit and install after 5 seconds
+    setTimeout(() => {
+      autoUpdater.quitAndInstall()
+    }, 5000)
+  })
+
+  autoUpdater.on('error', (err: Error) => {
+    // Silently fail — don't bother user with update errors
+    console.error('[autoUpdater]', err.message)
+  })
+
+  // Check for updates on startup (silently fails in dev)
+  autoUpdater.checkForUpdates().catch(() => {
+    // Dev mode or no releases yet — expected
+  })
+
+  // Check every 4 hours
+  setInterval(() => {
+    autoUpdater.checkForUpdates().catch(() => {})
+  }, 4 * 60 * 60 * 1000)
 })
 
 app.on('before-quit', () => {

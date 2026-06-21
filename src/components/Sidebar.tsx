@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { LayoutDashboard, MessageSquare, Brain, Wrench, Clock, User, Settings, FolderOpen, Power, Network, History, Shield, ChevronDown, Plus, Settings2, Check, Terminal, GitBranch, Store, Microscope, FlaskConical, Workflow, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, MessageSquare, Brain, Wrench, Clock, User, Settings, FolderOpen, Power, Network, History, Shield, ChevronDown, Plus, Settings2, Check, Terminal, GitBranch, Store, Microscope, FlaskConical, Workflow, BarChart3, ShieldCheck, Bell, Code2 } from 'lucide-react'
 import { useStore } from '../store'
 
 const NAV_ITEMS = [
@@ -13,12 +13,14 @@ const NAV_ITEMS = [
   { id: 'host', label: 'Host Control', icon: Terminal },
   { id: 'schedule', label: 'Schedule', icon: Clock },
   { id: 'safety', label: 'Safety', icon: Shield },
+  { id: 'vault', label: 'Vault', icon: ShieldCheck },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'api-playground', label: 'API Playground', icon: Code2 },
   { id: 'identity', label: 'Identity', icon: User },
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'metrics', label: 'Metrics', icon: BarChart3 },
   { id: 'playground', label: 'Playground', icon: FlaskConical },
   { id: 'automations', label: 'Automations', icon: Workflow },
-  { id: 'context', label: 'Context', icon: Microscope },
   { id: 'marketplace', label: 'Marketplace', icon: Store },
 ]
 

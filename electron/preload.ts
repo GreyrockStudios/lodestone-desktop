@@ -26,6 +26,16 @@ const api = {
   // App
   appVersion: () => ipcRenderer.invoke('app:version'),
   
+  // Auto-updater
+  checkForUpdates: () => ipcRenderer.invoke('update:check'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdateAvailable: (callback: (info: { version: string; releaseDate: string }) => void) =>
+    ipcRenderer.on('update:available', (_e: any, info: any) => callback(info)),
+  onUpdateProgress: (callback: (progress: { percent: number; transferred: number; total: number; speed: number }) => void) =>
+    ipcRenderer.on('update:progress', (_e: any, progress: any) => callback(progress)),
+  onUpdateDownloaded: (callback: (info: { version: string }) => void) =>
+    ipcRenderer.on('update:downloaded', (_e: any, info: any) => callback(info)),
+  
   // Brain
   scanBrain: () => ipcRenderer.invoke('brain:scan'),
   

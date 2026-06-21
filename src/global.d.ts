@@ -23,6 +23,11 @@ interface LodestoneAPI {
 
   // App
   appVersion: () => Promise<string>
+  checkForUpdates: () => Promise<{ available: boolean; version?: string; current: string; error?: string }>
+  installUpdate: () => Promise<{ success: boolean }>
+  onUpdateAvailable: (callback: (info: { version: string; releaseDate: string }) => void) => void
+  onUpdateProgress: (callback: (progress: { percent: number; transferred: number; total: number; speed: number }) => void) => void
+  onUpdateDownloaded: (callback: (info: { version: string }) => void) => void
   scanBrain: () => Promise<{ nodes: any[]; stats: any }>
   dashboardStats: () => Promise<any>
   updateSafety: (settings: any) => Promise<boolean>
