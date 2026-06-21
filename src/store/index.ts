@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 
+export type SocketStatus = 'connected' | 'connecting' | 'disconnected' | 'error'
+
 interface AppState {
   // Wizard
   hasConfig: boolean
@@ -27,6 +29,16 @@ interface AppState {
   memoryCount: number
   wikiCount: number
   setMemoryStats: (mem: number, wiki: number) => void
+  
+  // Socket connection status
+  socketStatus: SocketStatus
+  setSocketStatus: (s: SocketStatus) => void
+  
+  // Token counts
+  inputTokens: number
+  totalTokens: number
+  setInputTokens: (n: number) => void
+  setTotalTokens: (n: number) => void
   
   // Appearance
   theme: 'dark' | 'light'
@@ -76,6 +88,14 @@ export const useStore = create<AppState>((set) => ({
   memoryCount: 0,
   wikiCount: 0,
   setMemoryStats: (mem, wiki) => set({ memoryCount: mem, wikiCount: wiki }),
+  
+  socketStatus: 'disconnected',
+  setSocketStatus: (s) => set({ socketStatus: s }),
+  
+  inputTokens: 0,
+  totalTokens: 0,
+  setInputTokens: (n) => set({ inputTokens: n }),
+  setTotalTokens: (n) => set({ totalTokens: n }),
   
   theme: 'dark',
   setTheme: (t) => set({ theme: t }),

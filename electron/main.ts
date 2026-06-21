@@ -202,11 +202,75 @@ function stopLodestone() {
   }
 }
 
+// ---- Window state persistence ----
+const WINDOW_STATE_FILE = 'window-state.json'
+
+function getWindowStatePath() {
+  return path.join(getAppDataPath(), WINDOW_STATE_FILE)
+}
+
+interface WindowState {
+  x: number
+  y: number
+  width: number
+  height: number
+  isMaximized: boolean
+}
+
+function loadWindowState(): WindowState | null {
+  const statePath = getWindowStatePath()
+  if (fs.existsSync(statePath)) {
+    try {
+      const state = JSON.parse(fs.readFileSync(statePath, 'utf-8'))
+      if (
+        typeof state.x === 'number' &&
+        typeof state.y === 'number' &&
+        typeof state.width === 'number' &&
+        typeof state.height === 'number'
+      ) {
+        return state
+      }
+    } catch {
+      // Corrupt state file — ignore
+    }
+  }
+  return null
+}
+
+function saveWindowState(state: WindowState) {
+  const statePath = getWindowStatePath()
+  try {
+    fs.writeFileSync(statePath, JSON.stringify(state, null, 2), 'utf-8')
+  } catch {
+    // Can't save — ignore
+  }
+}
+
+// Debounced state saver
+let stateSaveTimer: ReturnType<typeof setTimeout> | null = null
+function debouncedSaveState() {
+  if (!mainWindow) return
+  if (stateSaveTimer) clearTimeout(stateSaveTimer)
+  stateSaveTimer = setTimeout(() => {
+    if (!mainWindow) return
+    const bounds = mainWindow.getBounds()
+    saveWindowState({
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+      isMaximized: mainWindow.isMaximized(),
+    })
+  }, 500)
+}
+
 // ---- Window management ----
 function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+  const savedState = loadWindowState()
+
+  const windowOptions: Electron.BrowserWindowConstructorOptions = {
+    width: savedState?.width ?? 1200,
+    height: savedState?.height ?? 800,
     minWidth: 900,
     minHeight: 600,
     title: 'Lodestone',
@@ -219,7 +283,20 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true
     }
-  })
+  }
+
+  // Restore position if we have saved state and it's not maximized
+  if (savedState && !savedState.isMaximized) {
+    windowOptions.x = savedState.x
+    windowOptions.y = savedState.y
+  }
+
+  mainWindow = new BrowserWindow(windowOptions)
+
+  // Restore maximized state if needed
+  if (savedState?.isMaximized) {
+    mainWindow.maximize()
+  }
 
   // Load the app
   if (process.env.VITE_DEV_SERVER_URL) {
@@ -238,10 +315,31 @@ function createWindow() {
     return { action: 'allow' }
   })
 
+  // Save window state on resize/move (debounced)
+  mainWindow.on('resize', debouncedSaveState)
+  mainWindow.on('move', debouncedSaveState)
+  mainWindow.on('maximize', debouncedSaveState)
+  mainWindow.on('unmaximize', debouncedSaveState)
+
+  // Minimize to tray on close
+  let hasShownTrayNotification = false
   mainWindow.on('close', (e) => {
     if (!isQuitting) {
       e.preventDefault()
       mainWindow?.hide()
+      // Show notification on first minimize-to-tray
+      if (!hasShownTrayNotification) {
+        hasShownTrayNotification = true
+        const config = loadConfig()
+        const agentName = config?.agentName || 'Lodestone'
+        if (tray) {
+          tray.displayBalloon({
+            iconType: 'info',
+            title: `${agentName}`,
+            content: 'Lodestone is still running in the background',
+          })
+        }
+      }
     }
   })
 
@@ -259,15 +357,39 @@ function createTray() {
   }
   tray = new Tray(icon)
   
+  const config = loadConfig()
+  const agentName = config?.agentName || 'Lodestone'
+  
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Open Lodestone', click: () => mainWindow?.show() },
+    { label: 'Show Window', click: () => {
+      mainWindow?.show()
+      mainWindow?.focus()
+    }},
+    { type: 'separator' },
+    { 
+      label: `Agent: ${agentName}`, 
+      enabled: false 
+    },
+    { 
+      label: lodestoneProcess ? '● Running' : '○ Stopped', 
+      enabled: false 
+    },
+    { type: 'separator' },
+    { label: 'New Chat', click: () => {
+      mainWindow?.webContents.send('app:navigate', 'chat')
+      mainWindow?.show()
+      mainWindow?.focus()
+    }},
     { type: 'separator' },
     { label: 'Quit', click: () => { isQuitting = true; app.quit() } }
   ])
 
-  tray.setToolTip('Lodestone')
+  tray.setToolTip(`Lodestone — ${agentName}`)
   tray.setContextMenu(contextMenu)
-  tray.on('click', () => mainWindow?.show())
+  tray.on('click', () => {
+    mainWindow?.show()
+    mainWindow?.focus()
+  })
 }
 
 // ---- IPC handlers ----
@@ -423,6 +545,33 @@ function setupIPC() {
   })
 
   ipcMain.handle('app:version', () => app.getVersion())
+  
+  // Crash Reporter — append to ~/.lodestone/crash-log.txt
+  ipcMain.handle('crash:writeLog', (_, message: string) => {
+    try {
+      const logPath = path.join(getAppDataPath(), 'crash-log.txt')
+      fs.appendFileSync(logPath, message, 'utf-8')
+      return true
+    } catch {
+      return false
+    }
+  })
+  
+  // Open external URL in default browser
+  ipcMain.handle('shell:openExternal', (_, url: string) => {
+    if (url.startsWith('http')) {
+      shell.openExternal(url)
+      return true
+    }
+    return false
+  })
+  
+  // Navigate to a view (used by tray menu "New Chat")
+  ipcMain.on('app:navigate', (_, view: string) => {
+    mainWindow?.webContents.send('app:navigate', view)
+    mainWindow?.show()
+    mainWindow?.focus()
+  })
   
   // Brain view — scan workspace for knowledge graph data
   ipcMain.handle('brain:scan', async () => {

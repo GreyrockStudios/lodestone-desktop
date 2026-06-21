@@ -12,12 +12,19 @@ import { BrainView } from './views/BrainView'
 import { Dashboard } from './views/Dashboard'
 import { History } from './views/History'
 import { Safety } from './views/Safety'
+import { CanvasView } from './views/CanvasView'
+import { PluginManager } from './components/PluginManager'
+import { WorkflowBuilder } from './components/WorkflowBuilder'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { CommandPalette } from './components/CommandPalette'
 import { StatusBar } from './components/StatusBar'
 import { SearchAll } from './components/SearchAll'
 import { useStore, type AgentConfig } from './store'
 import { ThemeToggle } from './components/ThemeToggle'
+import { Plug, GitBranch } from 'lucide-react'
+import { UpdateChecker } from './components/UpdateChecker'
+import { CrashReporter } from './components/CrashReporter'
+import { ShortcutsHelp } from './components/ShortcutsHelp'
 
 export default function App() {
   const { hasConfig, setHasConfig, activeView, setConfig, setEngineState, theme } = useStore()
@@ -57,6 +64,11 @@ export default function App() {
     window.lodestone.onEngineCrashed(() => {
       setEngineState(false, 0)
     })
+
+    // Listen for tray menu navigation (New Chat, etc.)
+    window.lodestone.onNavigate((view: string) => {
+      useStore.getState().setActiveView(view)
+    })
   }, [])
 
   if (!hasConfig) {
@@ -87,6 +99,29 @@ export default function App() {
           {activeView === 'tools' && <Tools />}
           {activeView === 'schedule' && <Schedule />}
           {activeView === 'safety' && <Safety />}
+          {activeView === 'canvas' && <CanvasView />}
+          {activeView === 'plugins' && (
+            <div className="flex-1 overflow-y-auto p-6" style={{ background: 'var(--bg)' }}>
+              <div className="max-w-2xl mx-auto">
+                <div className="flex items-center gap-2 mb-4">
+                  <Plug className="w-5 h-5 text-violet-400" />
+                  <h2 className="text-base font-semibold" style={{ color: 'var(--text)' }}>Plugins</h2>
+                </div>
+                <PluginManager />
+              </div>
+            </div>
+          )}
+          {activeView === 'workflows' && (
+            <div className="flex-1 overflow-y-auto p-6" style={{ background: 'var(--bg)' }}>
+              <div className="max-w-3xl mx-auto">
+                <div className="flex items-center gap-2 mb-4">
+                  <GitBranch className="w-5 h-5 text-violet-400" />
+                  <h2 className="text-base font-semibold" style={{ color: 'var(--text)' }}>Workflows</h2>
+                </div>
+                <WorkflowBuilder />
+              </div>
+            </div>
+          )}
           {activeView === 'identity' && <Identity />}
           {activeView === 'settings' && <SettingsView />}
         </main>
@@ -97,6 +132,8 @@ export default function App() {
       )}
       <CommandPalette />
       <SearchAll open={searchAllOpen} onClose={() => setSearchAllOpen(false)} onNavigate={(view) => useStore.getState().setActiveView(view)} />
+      <CrashReporter />
+      <ShortcutsHelp />
     </div>
   )
 }

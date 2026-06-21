@@ -32,6 +32,15 @@ interface LodestoneAPI {
   getHistory: (sessionId: string) => Promise<any | null>
   exportHistory: (sessionId: string) => Promise<string | null>
   onEngineCrashed: (callback: (data: { code: number }) => void) => void
+
+  // Crash Reporter
+  writeCrashLog: (message: string) => Promise<boolean>
+
+  // External links
+  openExternal: (url: string) => Promise<boolean>
+
+  // Tray navigation
+  onNavigate: (callback: (view: string) => void) => void
 }
 
 interface AgentConfig {

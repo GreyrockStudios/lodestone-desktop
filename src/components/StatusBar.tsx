@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Circle, Clock, Cpu, Database, FileText, Wrench,
-  RefreshCw, AlertCircle,
+  RefreshCw, AlertCircle, Loader2,
 } from 'lucide-react'
-import { useStore } from '../store'
+import { useStore, type SocketStatus } from '../store'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -35,6 +35,18 @@ function formatUptime(seconds: number): string {
   return `${s}s`
 }
 
+function formatTokenCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
+}
+
+function tokenColor(n: number): string {
+  if (n >= 8000) return '#EF4444' // red
+  if (n >= 4000) return '#F59E0B' // amber
+  return '#10B981' // green
+}
+
 // ─── Status Dot ───────────────────────────────────────────────────────
 
 function StatusDot({ running, starting }: { running: boolean; starting: boolean }) {
@@ -53,6 +65,32 @@ function StatusDot({ running, starting }: { running: boolean; starting: boolean 
         flexShrink: 0,
       }}
     />
+  )
+}
+
+// ─── Socket Status Indicator ─────────────────────────────────────────
+
+function SocketStatusIndicator({ status }: { status: SocketStatus }) {
+  const config: Record<SocketStatus, { color: string; label: string; spin: boolean }> = {
+    connected: { color: '#10B981', label: 'Connected', spin: false },
+    connecting: { color: '#F59E0B', label: 'Reconnecting...', spin: true },
+    disconnected: { color: '#6B7280', label: 'Disconnected', spin: false },
+    error: { color: '#EF4444', label: 'Connection error', spin: false },
+  }
+  const { color, label, spin } = config[status]
+
+  return (
+    <div className="flex items-center gap-1" title={`Socket: ${label}`}>
+      {spin ? (
+        <Loader2 className="w-3 h-3 animate-spin" style={{ color, animationDuration: '1s' }} />
+      ) : (
+        <span
+          className="inline-block rounded-full"
+          style={{ width: 6, height: 6, background: color, boxShadow: status === 'connected' ? `0 0 5px ${color}80` : 'none', flexShrink: 0 }}
+        />
+      )}
+      <span style={{ color, fontSize: 11, whiteSpace: 'nowrap' }}>{label}</span>
+    </div>
   )
 }
 
@@ -102,7 +140,7 @@ function Badge({
 // ─── StatusBar ───────────────────────────────────────────────────────
 
 export function StatusBar() {
-  const { engineRunning, enginePort, config, setActiveView } = useStore()
+  const { engineRunning, enginePort, config, setActiveView, socketStatus, inputTokens, totalTokens } = useStore()
   const [uptime, setUptime] = useState(0)
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -194,8 +232,8 @@ export function StatusBar() {
         flexShrink: 0,
       }}
     >
-      {/* Left: Engine status */}
-      <div className="flex items-center gap-2">
+      {/* Left: Engine status + Socket status */}
+      <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5">
           <StatusDot running={running} starting={false} />
           <span style={{ color: running ? 'var(--text-muted)' : 'var(--text-dim)' }}>
@@ -208,12 +246,28 @@ export function StatusBar() {
             <span>{formatUptime(uptime)}</span>
           </div>
         )}
+        {running && (
+          <div className="flex items-center" style={{ opacity: 0.8 }}>
+            <span style={{ color: 'var(--border)', margin: '0 2px' }}>|</span>
+            <SocketStatusIndicator status={socketStatus} />
+          </div>
+        )}
       </div>
 
-      {/* Center: Model name */}
-      <div className="flex items-center gap-1.5" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
-        <Cpu className="w-3 h-3" style={{ opacity: 0.5 }} />
-        <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>{model}</span>
+      {/* Center: Model name + Token counter */}
+      <div className="flex items-center gap-3" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+        <div className="flex items-center gap-1.5">
+          <Cpu className="w-3 h-3" style={{ opacity: 0.5 }} />
+          <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>{model}</span>
+        </div>
+        {running && totalTokens > 0 && (
+          <div className="flex items-center gap-1.5" title="Input / Total tokens (approx)">
+            <span style={{ color: tokenColor(inputTokens), fontWeight: 500 }}>{formatTokenCount(inputTokens)}</span>
+            <span style={{ color: 'var(--text-dim)', opacity: 0.5 }}>/</span>
+            <span style={{ color: tokenColor(totalTokens), fontWeight: 500 }}>{formatTokenCount(totalTokens)}</span>
+            <span style={{ color: 'var(--text-dim)', opacity: 0.6 }}>tokens</span>
+          </div>
+        )}
       </div>
 
       {/* Right: Badges */}

@@ -7,6 +7,7 @@ import {
   User, CircleDot,
 } from 'lucide-react'
 import { useStore } from '../store'
+import { UpdateChecker } from '../components/UpdateChecker'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -174,6 +175,7 @@ export function Dashboard() {
 
   return (
     <div className="flex-1 overflow-y-auto" style={{ background: 'var(--bg)' }}>
+      <UpdateChecker />
       <div className="max-w-5xl mx-auto p-6 space-y-6">
         {/* ─── Hero Section ────────────────────────────────────────── */}
         <HeroSection

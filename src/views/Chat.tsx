@@ -1,11 +1,42 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Send, Sparkles, Copy, Pin, Download, Activity as ActivityIcon, ChevronUp, ChevronDown, Paperclip, X, FileText, Image as ImageIcon, Mic, FileDown } from 'lucide-react'
+import { Send, Sparkles, Copy, Pin, Download, Activity as ActivityIcon, ChevronUp, ChevronDown, Paperclip, X, FileText, Image as ImageIcon, Mic, FileDown, PanelRightClose, PanelRight, ChevronLeft } from 'lucide-react'
 import { useStore, type ChatMessage } from '../store'
 import { io, Socket } from 'socket.io-client'
 import { marked } from 'marked'
 import { ActivityFeed, type ActivityEntry } from '../components/ActivityFeed'
+import { ToolExecutionModal } from '../components/ToolExecutionModal'
+import { useVoiceInput } from '../hooks/useVoiceInput'
 
 marked.setOptions({ breaks: true, gfm: true })
+
+// ─── Toast ────────────────────────────────────────────────────────────
+
+function Toast({ message, onClose }: { message: string; onClose: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000)
+    return () => clearTimeout(timer)
+  }, [onClose])
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 80,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: 'var(--bg-elevated)',
+        border: '1px solid var(--border)',
+        color: 'var(--text)',
+        padding: '10px 20px',
+        borderRadius: 10,
+        fontSize: 13,
+        zIndex: 10000,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+      }}
+    >
+      {message}
+    </div>
+  )
+}
 
 // ─── Context Menu ─────────────────────────────────────────────────────
 
@@ -169,15 +200,178 @@ function getRelativeTime(ts: number): string {
 }
 
 function stripMarkdown(md: string): string {
-  // Simple markdown-to-plain-text: remove common markers
   return md
-    .replace(/```[\s\S]*?```/g, '') // code blocks
-    .replace(/`([^`]+)`/g, '$1') // inline code
-    .replace(/!\[.*?\]\(.*?\)/g, '') // images
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links
-    .replace(/[#*_>~\-]/g, '') // formatting chars
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[.*?\]\(.*?\)/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[#*_>~\-]/g, '')
     .replace(/\n{2,}/g, '\n')
     .trim()
+}
+
+// ─── Pinned Messages Panel ────────────────────────────────────────────
+
+function PinnedMessagesPanel({
+  pinnedMessages,
+  onScrollToMessage,
+  onUnpin,
+  onClose,
+}: {
+  pinnedMessages: ChatMessage[]
+  onScrollToMessage: (msg: ChatMessage) => void
+  onUnpin: (msg: ChatMessage) => void
+  onClose: () => void
+}) {
+  return (
+    <div
+      style={{
+        width: 240,
+        flexShrink: 0,
+        borderRight: '1px solid var(--border)',
+        background: 'var(--bg-card)',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+      }}
+    >
+      {/* Panel header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px 14px',
+          borderBottom: '1px solid var(--border)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Pin style={{ width: 14, height: 14, color: 'var(--accent)' }} />
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Pinned</span>
+          <span
+            style={{
+              fontSize: 10,
+              background: 'var(--bg-elevated)',
+              color: 'var(--text-dim)',
+              padding: '1px 6px',
+              borderRadius: 10,
+            }}
+          >
+            {pinnedMessages.length}
+          </span>
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 2,
+            borderRadius: 4,
+          }}
+          title="Close pinned panel"
+        >
+          <ChevronLeft style={{ width: 16, height: 16, color: 'var(--text-muted)' }} />
+        </button>
+      </div>
+
+      {/* Pinned messages list */}
+      <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
+        {pinnedMessages.length === 0 ? (
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '24px 12px',
+              color: 'var(--text-dim)',
+              fontSize: 12,
+            }}
+          >
+            <Pin style={{ width: 24, height: 24, margin: '0 auto 8px', opacity: 0.3 }} />
+            No pinned messages yet.
+            <br />
+            Right-click a message to pin it.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {pinnedMessages.map((msg) => (
+              <div
+                key={msg.id}
+                style={{
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  padding: 10,
+                  cursor: 'pointer',
+                  transition: 'border-color 0.15s',
+                }}
+                onClick={() => onScrollToMessage(msg)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border)'
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 4,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.03em',
+                      color: msg.role === 'user' ? '#8B5CF6' : '#06B6D4',
+                    }}
+                  >
+                    {msg.role === 'user' ? 'You' : msg.role === 'assistant' ? 'Agent' : 'System'}
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onUnpin(msg)
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 0,
+                      opacity: 0.4,
+                    }}
+                    title="Unpin"
+                  >
+                    <X style={{ width: 12, height: 12, color: 'var(--text-dim)' }} />
+                  </button>
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--text-muted)',
+                    lineHeight: 1.4,
+                    overflow: 'hidden',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical',
+                  }}
+                >
+                  {stripMarkdown(msg.content).slice(0, 120)}
+                  {msg.content.length > 120 ? '…' : ''}
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
+                  {getRelativeTime(msg.timestamp)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 // ─── Main Chat Component ──────────────────────────────────────────────
@@ -193,9 +387,24 @@ export function Chat() {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [showActivity, setShowActivity] = useState(false)
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set())
+  const [showPinnedPanel, setShowPinnedPanel] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [attachments, setAttachments] = useState<File[]>([])
   const dragCounter = useRef(0)
+  const [toast, setToast] = useState<string | null>(null)
+  const [toolModal, setToolModal] = useState<string | null>(null)
+  const messageRefs = useRef<Map<string, HTMLDivElement | null>>(new Map())
+
+  // Voice input
+  const { listening: voiceListening, supported: voiceSupported, toggle: toggleVoice } = useVoiceInput(
+    useCallback((text: string, _isFinal: boolean) => {
+      setInput(text)
+      // Focus textarea after receiving transcript
+      if (textareaRef.current) {
+        textareaRef.current.focus()
+      }
+    }, []),
+  )
 
   const mockActivity = useMemo(() => generateMockActivity(), [])
 
@@ -281,7 +490,7 @@ export function Chat() {
     if (!el) return
     el.style.height = 'auto'
     const lineHeight = 22
-    const maxHeight = lineHeight * 6 // 6 rows max
+    const maxHeight = lineHeight * 6
     el.style.height = Math.min(el.scrollHeight, maxHeight) + 'px'
   }, [input])
 
@@ -336,7 +545,6 @@ export function Chat() {
     if ((!input.trim() && attachments.length === 0) || !socketRef.current) return
     setSending(true)
 
-    // Build message with attachment info
     let content = input.trim()
     if (attachments.length > 0) {
       const fileList = attachments.map(f => `[Attached: ${f.name} (${(f.size / 1024).toFixed(1)}KB)]`).join('\n')
@@ -372,8 +580,15 @@ export function Chat() {
   const handlePin = useCallback((msg: ChatMessage) => {
     setPinnedIds((prev) => {
       const next = new Set(prev)
-      if (next.has(msg.id)) next.delete(msg.id)
-      else next.add(msg.id)
+      if (next.has(msg.id)) {
+        next.delete(msg.id)
+      } else {
+        next.add(msg.id)
+        // Show panel when first message is pinned
+        if (next.size === 1) {
+          setShowPinnedPanel(true)
+        }
+      }
       return next
     })
   }, [])
@@ -404,8 +619,25 @@ export function Chat() {
   }, [messages, config])
 
   const handleMicClick = useCallback(() => {
-    // TODO: wire to Web Speech API or Whisper
-    console.log('Mic clicked — voice input not yet wired')
+    if (!voiceSupported) {
+      setToast('Voice input not supported in this browser')
+      return
+    }
+    toggleVoice()
+  }, [voiceSupported, toggleVoice])
+
+  const handleScrollToMessage = useCallback((msg: ChatMessage) => {
+    const el = messageRefs.current.get(msg.id)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // Brief highlight
+      el.style.transition = 'background 0.3s'
+      const orig = el.style.background
+      el.style.background = 'rgba(139, 92, 246, 0.1)'
+      setTimeout(() => {
+        el.style.background = orig
+      }, 1000)
+    }
   }, [])
 
   // Sorted: pinned first, then by time
@@ -413,6 +645,10 @@ export function Chat() {
     const pinned = messages.filter((m) => pinnedIds.has(m.id))
     const rest = messages.filter((m) => !pinnedIds.has(m.id))
     return [...pinned, ...rest]
+  }, [messages, pinnedIds])
+
+  const pinnedMessages = useMemo(() => {
+    return messages.filter((m) => pinnedIds.has(m.id))
   }, [messages, pinnedIds])
 
   if (!engineRunning) {
@@ -431,211 +667,327 @@ export function Chat() {
 
   return (
     <div
-      className="flex-1 flex flex-col h-full relative"
+      className="flex-1 flex h-full relative"
       style={{ background: 'var(--bg)' }}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
     >
-      {/* Drag overlay */}
-      {isDragging && (
-        <div
-          className="absolute inset-0 z-50 flex items-center justify-center"
-          style={{ background: 'rgba(139, 92, 246, 0.1)', backdropFilter: 'blur(4px)' }}
-        >
-          <div className="text-center" style={{ background: 'var(--bg-card)', border: '2px dashed var(--accent)', borderRadius: 16, padding: '32px 48px' }}>
-            <Paperclip className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--accent)' }} />
-            <p className="text-base font-medium" style={{ color: 'var(--text)' }}>Drop files to attach</p>
-            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>PDF, images, code, text files</p>
-          </div>
-        </div>
-      )}
-      {/* Header */}
-      <div
-        className="flex items-center justify-between px-6 py-2 border-b"
-        style={{ borderColor: 'var(--border)', background: 'var(--bg-card)', flexShrink: 0 }}
-      >
-        <div className="flex items-center gap-3">
-          <h2 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-            Chat with {config?.agentName || 'your agent'}
-          </h2>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={handleExportConversation}
-            disabled={messages.length === 0}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all"
-            style={{
-              background: 'transparent',
-              border: '1px solid transparent',
-              color: 'var(--text-muted)',
-              fontSize: 12,
-              cursor: messages.length > 0 ? 'pointer' : 'not-allowed',
-              opacity: messages.length > 0 ? 1 : 0.4,
-              fontFamily: 'inherit',
-            }}
-            title="Export conversation as Markdown"
-          >
-            <FileDown className="w-3.5 h-3.5" />
-            <span>Export</span>
-          </button>
-          <button
-            onClick={() => setShowActivity((v) => !v)}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all"
-            style={{
-              background: showActivity ? 'var(--bg-elevated)' : 'transparent',
-              border: `1px solid ${showActivity ? 'var(--border)' : 'transparent'}`,
-              color: showActivity ? 'var(--accent)' : 'var(--text-muted)',
-              fontSize: 12,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            <ActivityIcon className="w-3.5 h-3.5" />
-            <span>Activity</span>
-            {showActivity ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
-          </button>
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4">
-        {messages.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center max-w-md">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: 'linear-gradient(135deg, #8B5CF6, #06B6D4)' }}>
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
-              <h3 className="text-base font-medium mb-1">Chat with {config?.agentName || 'your agent'}</h3>
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Ask anything. Your agent has memory, tools, and learns from every interaction.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="max-w-3xl mx-auto space-y-4">
-            {sortedMessages.map((msg) => (
-              <MessageBubble
-                key={msg.id}
-                msg={msg}
-                pinned={pinnedIds.has(msg.id)}
-                onContextMenu={handleContextMenu}
-              />
-            ))}
-            {streamingText && (
-              <div className="flex justify-start">
-                <div
-                  className="max-w-[80%] px-4 py-3 rounded-2xl text-sm opacity-80 prose-chat"
-                  style={{ background: 'var(--bg-card)', color: 'var(--text)', border: '1px solid var(--border)' }}
-                  dangerouslySetInnerHTML={{ __html: marked.parse(streamingText) as string }}
-                />
-              </div>
-            )}
-            {sending && !streamingText && (
-              <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
-                <TypingDots name={config?.agentName || 'Agent'} />
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Activity Feed */}
-      {showActivity && (
-        <ActivityFeed entries={mockActivity} onClear={() => {}} />
-      )}
-
-      {/* Input */}
-      <div className="p-4 border-t" style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}>
-        <div className="max-w-3xl mx-auto">
-          {/* Attachments bar */}
-          {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-2">
-              {attachments.map((file, idx) => (
-                <div key={idx} className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
-                  {file.type.startsWith('image/') ? (
-                    <ImageIcon className="w-3.5 h-3.5" style={{ color: '#06B6D4' }} />
-                  ) : (
-                    <FileText className="w-3.5 h-3.5" style={{ color: '#A78BFA' }} />
-                  )}
-                  <span className="text-xs" style={{ color: 'var(--text)' }}>{file.name}</span>
-                  <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{(file.size / 1024).toFixed(0)}KB</span>
-                  <button onClick={() => removeAttachment(idx)} className="p-0.5 rounded hover:bg-red-500/10">
-                    <X className="w-3 h-3" style={{ color: '#EF4444' }} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          <div className="flex items-end gap-2">
-            <input type="file" multiple onChange={handleFileSelect} style={{ display: 'none' }} id="file-input" />
-            <button
-              onClick={() => document.getElementById('file-input')?.click()}
-              className="w-11 h-11 rounded-xl flex items-center justify-center transition-all flex-shrink-0"
-              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
-              title="Attach files"
-            >
-              <Paperclip className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            </button>
-            <button
-              onClick={handleMicClick}
-              className="w-11 h-11 rounded-xl flex items-center justify-center transition-all flex-shrink-0"
-              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
-              title="Voice input"
-            >
-              <Mic className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            </button>
-            <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                handleSend()
-              }
-            }}
-            placeholder="Send a message..."
-            rows={1}
-            className="flex-1 px-4 py-3 rounded-xl text-sm resize-none overflow-hidden"
-            style={{
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--border)',
-              color: 'var(--text)',
-              minHeight: '44px',
-              lineHeight: '22px',
-              fontFamily: 'inherit',
-            }}
-          />
-          <button
-            onClick={handleSend}
-            disabled={(!input.trim() && attachments.length === 0) || sending}
-            className="w-11 h-11 rounded-xl flex items-center justify-center transition-all flex-shrink-0"
-            style={{
-              background: (input.trim() || attachments.length > 0) ? "linear-gradient(135deg, #8B5CF6, #7C3AED)" : "var(--bg-elevated)",
-              border: 'none',
-              cursor: ((input.trim() || attachments.length > 0) && !sending) ? 'pointer' : 'not-allowed',
-            }}
-          >
-            <Send className="w-4 h-4" style={{ color: (input.trim() || attachments.length > 0) ? 'white' : 'var(--text-dim)' }} />
-          </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Context Menu */}
-      {contextMenu && (
-        <ContextMenu
-          state={contextMenu}
-          onClose={() => setContextMenu(null)}
-          onCopy={handleCopy}
-          onCopyMarkdown={handleCopyMarkdown}
-          onPin={handlePin}
-          onExport={handleExport}
+      {/* Pinned Messages Panel */}
+      {showPinnedPanel && (
+        <PinnedMessagesPanel
+          pinnedMessages={pinnedMessages}
+          onScrollToMessage={handleScrollToMessage}
+          onUnpin={handlePin}
+          onClose={() => setShowPinnedPanel(false)}
         />
       )}
+
+      {/* Main Chat Area */}
+      <div
+        className="flex-1 flex flex-col h-full relative"
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
+        {/* Drag overlay */}
+        {isDragging && (
+          <div
+            className="absolute inset-0 z-50 flex items-center justify-center"
+            style={{ background: 'rgba(139, 92, 246, 0.1)', backdropFilter: 'blur(4px)' }}
+          >
+            <div className="text-center" style={{ background: 'var(--bg-card)', border: '2px dashed var(--accent)', borderRadius: 16, padding: '32px 48px' }}>
+              <Paperclip className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--accent)' }} />
+              <p className="text-base font-medium" style={{ color: 'var(--text)' }}>Drop files to attach</p>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>PDF, images, code, text files</p>
+            </div>
+          </div>
+        )}
+
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-6 py-2 border-b"
+          style={{ borderColor: 'var(--border)', background: 'var(--bg-card)', flexShrink: 0 }}
+        >
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+              Chat with {config?.agentName || 'your agent'}
+            </h2>
+            {pinnedIds.size > 0 && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  fontSize: 11,
+                  background: 'rgba(139, 92, 246, 0.12)',
+                  color: '#A78BFA',
+                  padding: '1px 8px',
+                  borderRadius: 10,
+                  fontWeight: 500,
+                }}
+              >
+                <Pin style={{ width: 10, height: 10 }} />
+                {pinnedIds.size}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            {/* Pinned panel toggle */}
+            {pinnedIds.size > 0 && (
+              <button
+                onClick={() => setShowPinnedPanel((v) => !v)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all"
+                style={{
+                  background: showPinnedPanel ? 'var(--bg-elevated)' : 'transparent',
+                  border: `1px solid ${showPinnedPanel ? 'var(--border)' : 'transparent'}`,
+                  color: showPinnedPanel ? 'var(--accent)' : 'var(--text-muted)',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+                title="Toggle pinned panel"
+              >
+                {showPinnedPanel ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRight className="w-3.5 h-3.5" />}
+              </button>
+            )}
+            <button
+              onClick={handleExportConversation}
+              disabled={messages.length === 0}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all"
+              style={{
+                background: 'transparent',
+                border: '1px solid transparent',
+                color: 'var(--text-muted)',
+                fontSize: 12,
+                cursor: messages.length > 0 ? 'pointer' : 'not-allowed',
+                opacity: messages.length > 0 ? 1 : 0.4,
+                fontFamily: 'inherit',
+              }}
+              title="Export conversation as Markdown"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              <span>Export</span>
+            </button>
+            <button
+              onClick={() => setShowActivity((v) => !v)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all"
+              style={{
+                background: showActivity ? 'var(--bg-elevated)' : 'transparent',
+                border: `1px solid ${showActivity ? 'var(--border)' : 'transparent'}`,
+                color: showActivity ? 'var(--accent)' : 'var(--text-muted)',
+                fontSize: 12,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              <ActivityIcon className="w-3.5 h-3.5" />
+              <span>Activity</span>
+              {showActivity ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4">
+          {messages.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center max-w-md">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: 'linear-gradient(135deg, #8B5CF6, #06B6D4)' }}>
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-base font-medium mb-1">Chat with {config?.agentName || 'your agent'}</h3>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  Ask anything. Your agent has memory, tools, and learns from every interaction.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="max-w-3xl mx-auto space-y-4">
+              {sortedMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  ref={(el) => { messageRefs.current.set(msg.id, el) }}
+                >
+                  <MessageBubble
+                    msg={msg}
+                    pinned={pinnedIds.has(msg.id)}
+                    onContextMenu={handleContextMenu}
+                    onToolClick={(toolName: string) => setToolModal(toolName)}
+                  />
+                </div>
+              ))}
+              {streamingText && (
+                <div className="flex justify-start">
+                  <div
+                    className="max-w-[80%] px-4 py-3 rounded-2xl text-sm opacity-80 prose-chat"
+                    style={{ background: 'var(--bg-card)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                    dangerouslySetInnerHTML={{ __html: marked.parse(streamingText) as string }}
+                  />
+                </div>
+              )}
+              {sending && !streamingText && (
+                <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+                  <TypingDots name={config?.agentName || 'Agent'} />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Activity Feed */}
+        {showActivity && (
+          <ActivityFeed entries={mockActivity} onClear={() => {}} />
+        )}
+
+        {/* Input */}
+        <div className="p-4 border-t" style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}>
+          <div className="max-w-3xl mx-auto">
+            {/* Attachments bar */}
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {attachments.map((file, idx) => (
+                  <div key={idx} className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+                    {file.type.startsWith('image/') ? (
+                      <ImageIcon className="w-3.5 h-3.5" style={{ color: '#06B6D4' }} />
+                    ) : (
+                      <FileText className="w-3.5 h-3.5" style={{ color: '#A78BFA' }} />
+                    )}
+                    <span className="text-xs" style={{ color: 'var(--text)' }}>{file.name}</span>
+                    <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{(file.size / 1024).toFixed(0)}KB</span>
+                    <button onClick={() => removeAttachment(idx)} className="p-0.5 rounded hover:bg-red-500/10">
+                      <X className="w-3 h-3" style={{ color: '#EF4444' }} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Voice listening indicator */}
+            {voiceListening && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  marginBottom: 8,
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                }}
+              >
+                <div
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: '#EF4444',
+                    animation: 'voicePulse 1.2s ease-in-out infinite',
+                  }}
+                />
+                <span style={{ fontSize: 12, color: '#EF4444', fontWeight: 500 }}>Listening…</span>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Speak now. Click mic again to stop.</span>
+                <style>{`
+                  @keyframes voicePulse {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.4; transform: scale(1.3); }
+                  }
+                `}</style>
+              </div>
+            )}
+
+            <div className="flex items-end gap-2">
+              <input type="file" multiple onChange={handleFileSelect} style={{ display: 'none' }} id="file-input" />
+              <button
+                onClick={() => document.getElementById('file-input')?.click()}
+                className="w-11 h-11 rounded-xl flex items-center justify-center transition-all flex-shrink-0"
+                style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
+                title="Attach files"
+              >
+                <Paperclip className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+              </button>
+              <button
+                onClick={handleMicClick}
+                className="w-11 h-11 rounded-xl flex items-center justify-center transition-all flex-shrink-0"
+                style={{
+                  background: voiceListening ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-elevated)',
+                  border: voiceListening ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--border)',
+                }}
+                title="Voice input"
+              >
+                <Mic
+                  className="w-4 h-4"
+                  style={{
+                    color: voiceListening ? '#EF4444' : 'var(--text-muted)',
+                    animation: voiceListening ? 'micPulse 1.2s ease-in-out infinite' : 'none',
+                  }}
+                />
+                {voiceListening && (
+                  <style>{`
+                    @keyframes micPulse {
+                      0%, 100% { opacity: 1; }
+                      50% { opacity: 0.4; }
+                    }
+                  `}</style>
+                )}
+              </button>
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSend()
+                  }
+                }}
+                placeholder={voiceListening ? 'Listening…' : 'Send a message...'}
+                rows={1}
+                className="flex-1 px-4 py-3 rounded-xl text-sm resize-none overflow-hidden"
+                style={{
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text)',
+                  minHeight: '44px',
+                  lineHeight: '22px',
+                  fontFamily: 'inherit',
+                }}
+              />
+              <button
+                onClick={handleSend}
+                disabled={(!input.trim() && attachments.length === 0) || sending}
+                className="w-11 h-11 rounded-xl flex items-center justify-center transition-all flex-shrink-0"
+                style={{
+                  background: (input.trim() || attachments.length > 0) ? "linear-gradient(135deg, #8B5CF6, #7C3AED)" : "var(--bg-elevated)",
+                  border: 'none',
+                  cursor: ((input.trim() || attachments.length > 0) && !sending) ? 'pointer' : 'not-allowed',
+                }}
+              >
+                <Send className="w-4 h-4" style={{ color: (input.trim() || attachments.length > 0) ? 'white' : 'var(--text-dim)' }} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Context Menu */}
+        {contextMenu && (
+          <ContextMenu
+            state={contextMenu}
+            onClose={() => setContextMenu(null)}
+            onCopy={handleCopy}
+            onCopyMarkdown={handleCopyMarkdown}
+            onPin={handlePin}
+            onExport={handleExport}
+          />
+        )}
+
+        {/* Toast */}
+        {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+
+        {/* Tool Execution Modal */}
+        {toolModal && (
+          <ToolExecutionModal toolName={toolModal} onClose={() => setToolModal(null)} />
+        )}
+      </div>
     </div>
   )
 }
@@ -674,10 +1026,16 @@ function MessageBubble({
   msg,
   pinned,
   onContextMenu,
+  onToolClick,
+  dimmed = false,
+  highlightQuery = '',
 }: {
   msg: ChatMessage
   pinned: boolean
   onContextMenu: (e: React.MouseEvent, msg: ChatMessage) => void
+  onToolClick: (toolName: string) => void
+  dimmed?: boolean
+  highlightQuery?: string
 }) {
   const isUser = msg.role === 'user'
   const isSystem = msg.role === 'system'
@@ -693,6 +1051,7 @@ function MessageBubble({
   return (
     <div
       className={`group flex ${isUser ? 'justify-end' : 'justify-start'}`}
+      style={{ opacity: dimmed ? 0.3 : 1, transition: 'opacity 0.2s' }}
       onContextMenu={(e) => onContextMenu(e, msg)}
     >
       <div className="flex flex-col" style={{ maxWidth: '80%' }}>
@@ -725,9 +1084,30 @@ function MessageBubble({
           {msg.tools && msg.tools.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
               {msg.tools.map((t) => (
-                <span key={t} className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(139, 92, 246, 0.15)', color: '#A78BFA' }}>
+                <button
+                  key={t}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToolClick(t)
+                  }}
+                  className="text-xs px-2 py-0.5 rounded-full transition-all"
+                  style={{
+                    background: 'rgba(139, 92, 246, 0.15)',
+                    color: '#A78BFA',
+                    border: '1px solid rgba(139, 92, 246, 0.2)',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(139, 92, 246, 0.25)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)'
+                  }}
+                  title={`View details for ${t}`}
+                >
                   {t}
-                </span>
+                </button>
               ))}
             </div>
           )}

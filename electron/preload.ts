@@ -46,6 +46,17 @@ const api = {
   onEngineCrashed: (callback: (data: any) => void) => {
     ipcRenderer.on('lodestone:crashed', (_, data) => callback(data))
   },
+  
+  // Crash Reporter
+  writeCrashLog: (message: string) => ipcRenderer.invoke('crash:writeLog', message),
+  
+  // External links
+  openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
+  
+  // Tray navigation events
+  onNavigate: (callback: (view: string) => void) => {
+    ipcRenderer.on('app:navigate', (_, view) => callback(view))
+  },
 }
 
 contextBridge.exposeInMainWorld('lodestone', api)
