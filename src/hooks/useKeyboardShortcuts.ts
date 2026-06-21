@@ -1,12 +1,12 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 
 /**
  * Global keyboard shortcuts for the app.
  * Cmd/Ctrl+1-9 switches between views.
- * Cmd/Ctrl+K opens command palette (handled in CommandPalette component).
+ * Cmd/Ctrl+K opens command palette.
+ * Cmd/Ctrl+Shift+F opens search-all.
  * Cmd/Ctrl+, opens settings.
- * Cmd/Ctrl+N starts new chat.
  */
 const VIEW_KEYS: Record<string, string> = {
   '1': 'dashboard',
@@ -22,6 +22,7 @@ const VIEW_KEYS: Record<string, string> = {
 
 export function useKeyboardShortcuts() {
   const { setActiveView } = useStore()
+  const [searchAllOpen, setSearchAllOpen] = useState(false)
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -32,6 +33,13 @@ export function useKeyboardShortcuts() {
       if (e.key in VIEW_KEYS && !e.shiftKey && !e.altKey) {
         e.preventDefault()
         setActiveView(VIEW_KEYS[e.key])
+        return
+      }
+
+      // Cmd+Shift+F → Search All
+      if (e.key === 'f' && e.shiftKey) {
+        e.preventDefault()
+        setSearchAllOpen(true)
         return
       }
 
@@ -46,4 +54,6 @@ export function useKeyboardShortcuts() {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [setActiveView])
+
+  return { searchAllOpen, setSearchAllOpen }
 }

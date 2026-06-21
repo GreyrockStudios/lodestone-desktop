@@ -15,12 +15,13 @@ import { Safety } from './views/Safety'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { CommandPalette } from './components/CommandPalette'
 import { StatusBar } from './components/StatusBar'
+import { SearchAll } from './components/SearchAll'
 import { useStore, type AgentConfig } from './store'
 
 export default function App() {
   const { hasConfig, setHasConfig, activeView, setConfig, setEngineState } = useStore()
   const [showTour, setShowTour] = useState(false)
-  useKeyboardShortcuts()
+  const { searchAllOpen, setSearchAllOpen } = useKeyboardShortcuts()
 
   useEffect(() => {
     // Check if wizard is completed
@@ -86,6 +87,7 @@ export default function App() {
         <WelcomeTour onComplete={() => setShowTour(false)} />
       )}
       <CommandPalette />
+      <SearchAll open={searchAllOpen} onClose={() => setSearchAllOpen(false)} onNavigate={(view) => useStore.getState().setActiveView(view)} />
     </div>
   )
 }
