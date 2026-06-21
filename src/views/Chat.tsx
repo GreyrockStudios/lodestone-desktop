@@ -7,6 +7,7 @@ export function Chat() {
   const { messages, addMessage, engineRunning, enginePort, config } = useStore()
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [streamingText, setStreamingText] = useState<string | null>(null)
   const socketRef = useRef<Socket | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -23,32 +24,53 @@ export function Chat() {
         console.log('Connected to Lodestone engine')
       })
 
-      socket.on('message', (data: { role: string; content: string; tools?: string[] }) => {
+      socket.on('connected', (data: { sessionId: string }) => {
+        console.log('Session:', data.sessionId)
+      })
+
+      // Lodestone webchat emits 'response' (string) and 'agent_response' (object)
+      socket.on('response', (text: string) => {
         addMessage({
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: data.content,
+          content: text,
           timestamp: Date.now(),
-          tools: data.tools,
         })
         setSending(false)
       })
 
-      socket.on('tool_call', (data: { tool: string; args: any }) => {
+      socket.on('agent_response', (data: { text: string; content: string }) => {
         addMessage({
           id: crypto.randomUUID(),
-          role: 'system',
-          content: `Using tool: ${data.tool}`,
+          role: 'assistant',
+          content: data.content || data.text,
           timestamp: Date.now(),
-          tools: [data.tool],
         })
+        setSending(false)
       })
 
-      socket.on('error', (data: { message: string }) => {
+      // Streaming events
+      socket.on('stream', (text: string) => {
+        // Update or create streaming message
+        setStreamingText(text)
+      })
+
+      socket.on('stream_end', (text: string) => {
+        setStreamingText(null)
+        addMessage({
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: text,
+          timestamp: Date.now(),
+        })
+        setSending(false)
+      })
+
+      socket.on('error', (err: string) => {
         addMessage({
           id: crypto.randomUUID(),
           role: 'system',
-          content: `Error: ${data.message}`,
+          content: `Error: ${err}`,
           timestamp: Date.now(),
         })
         setSending(false)
@@ -66,7 +88,7 @@ export function Chat() {
   // Auto-scroll
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages])
+  }, [messages, streamingText])
 
   const handleSend = () => {
     if (!input.trim() || !socketRef.current) return
@@ -118,7 +140,17 @@ export function Chat() {
             {messages.map((msg) => (
               <MessageBubble key={msg.id} msg={msg} />
             ))}
-            {sending && (
+            {streamingText && (
+              <div className="flex justify-start">
+                <div
+                  className="max-w-[80%] px-4 py-3 rounded-2xl text-sm opacity-80"
+                  style={{ background: 'var(--bg-card)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                >
+                  {streamingText}
+                </div>
+              </div>
+            )}
+            {sending && !streamingText && (
               <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 {config?.agentName || 'Agent'} is thinking...
