@@ -11,6 +11,13 @@ interface LodestoneAPI {
   openInFinder: () => Promise<boolean>
   appVersion: () => Promise<string>
   scanBrain: () => Promise<{ nodes: any[]; stats: any }>
+  dashboardStats: () => Promise<any>
+  updateSafety: (settings: any) => Promise<boolean>
+  getNearMisses: () => Promise<any[]>
+  getConstraints: () => Promise<any[]>
+  listHistory: () => Promise<any[]>
+  getHistory: (sessionId: string) => Promise<any | null>
+  exportHistory: (sessionId: string) => Promise<string | null>
   onEngineCrashed: (callback: (data: { code: number }) => void) => void
 }
 

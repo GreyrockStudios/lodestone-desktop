@@ -21,6 +21,19 @@ const api = {
   // Brain
   scanBrain: () => ipcRenderer.invoke('brain:scan'),
   
+  // Dashboard
+  dashboardStats: () => ipcRenderer.invoke('dashboard:stats'),
+  
+  // Safety
+  updateSafety: (settings: any) => ipcRenderer.invoke('safety:update', settings),
+  getNearMisses: () => ipcRenderer.invoke('safety:nearMisses'),
+  getConstraints: () => ipcRenderer.invoke('safety:constraints'),
+  
+  // History
+  listHistory: () => ipcRenderer.invoke('history:list'),
+  getHistory: (sessionId: string) => ipcRenderer.invoke('history:get', sessionId),
+  exportHistory: (sessionId: string) => ipcRenderer.invoke('history:export', sessionId),
+  
   // Events
   onEngineCrashed: (callback: (data: any) => void) => {
     ipcRenderer.on('lodestone:crashed', (_, data) => callback(data))

@@ -18,6 +18,7 @@ let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let lodestoneProcess: ChildProcess | null = null
 let lodestonePort = 0
+let engineStartTime = 0
 let isQuitting = false
 
 // ---- Paths ----
@@ -145,6 +146,7 @@ safety:
           NODE_ENV: 'production'
         }
       })
+      engineStartTime = Date.now()
 
       let started = false
       const timeout = setTimeout(() => {
@@ -377,6 +379,170 @@ function setupIPC() {
       nodes,
       stats: { memoryCount, wikiCount, decisionCount, toolCallCount: 0 },
     }
+  })
+  
+  // Dashboard — get agent stats
+  ipcMain.handle('dashboard:stats', async () => {
+    const workspace = getWorkspacePath()
+    const config = loadConfig()
+    
+    // Count wiki pages
+    let wikiCount = 0
+    const wikiPath = path.join(workspace, 'wiki')
+    if (fs.existsSync(wikiPath)) {
+      const countFiles = (dir: string) => {
+        if (!fs.existsSync(dir)) return 0
+        let count = 0
+        const entries = fs.readdirSync(dir, { withFileTypes: true })
+        for (const entry of entries) {
+          if (entry.isDirectory()) count += countFiles(path.join(dir, entry.name))
+          else if (entry.name.endsWith('.md')) count++
+        }
+        return count
+      }
+      wikiCount = countFiles(wikiPath)
+    }
+    
+    // Count memories
+    let memoryCount = 0
+    const memoryPath = path.join(workspace, 'memory')
+    if (fs.existsSync(memoryPath)) {
+      const countFiles = (dir: string) => {
+        if (!fs.existsSync(dir)) return 0
+        let count = 0
+        const entries = fs.readdirSync(dir, { withFileTypes: true })
+        for (const entry of entries) {
+          if (entry.isDirectory()) count += countFiles(path.join(dir, entry.name))
+          else if (entry.name.endsWith('.md') || entry.name.endsWith('.json')) count++
+        }
+        return count
+      }
+      memoryCount = countFiles(memoryPath)
+    }
+    
+    // Count scheduled jobs
+    let jobCount = 0
+    const schedulesPath = path.join(getAppDataPath(), 'schedules')
+    if (fs.existsSync(schedulesPath)) {
+      jobCount = fs.readdirSync(schedulesPath).filter(f => f.endsWith('.json')).length
+    }
+    
+    // Count decisions
+    let decisionCount = 0
+    const decisionsPath = path.join(wikiPath, 'decisions')
+    if (fs.existsSync(decisionsPath)) {
+      decisionCount = fs.readdirSync(decisionsPath).filter(f => f.endsWith('.md')).length
+    }
+    
+    // Read safety config
+    const configPath = getConfigPath()
+    let redLines: string[] = ['Never exfiltrate private data', 'Never run destructive commands without confirmation']
+    let autoCapture = true
+    let requireConfirmation = true
+    if (fs.existsSync(configPath)) {
+      try {
+        const cfg = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+        if (cfg.redLines) redLines = cfg.redLines
+        if (cfg.autoCapture !== undefined) autoCapture = cfg.autoCapture
+        if (cfg.requireConfirmation !== undefined) requireConfirmation = cfg.requireConfirmation
+      } catch { /* ignore */ }
+    }
+    
+    return {
+      wikiCount,
+      memoryCount,
+      jobCount,
+      decisionCount,
+      model: config?.model || 'unknown',
+      provider: config?.llmProvider || 'unknown',
+      redLines,
+      autoCapture,
+      requireConfirmation,
+      engineRunning: lodestoneProcess !== null,
+      uptime: lodestoneProcess ? Date.now() - engineStartTime : 0,
+    }
+  })
+  
+  // Safety — save safety settings
+  ipcMain.handle('safety:update', (_, settings: { redLines?: string[]; autoCapture?: boolean; requireConfirmation?: boolean }) => {
+    const configPath = getConfigPath()
+    try {
+      const config = loadConfig() || {} as any
+      if (settings.redLines !== undefined) config.redLines = settings.redLines
+      if (settings.autoCapture !== undefined) config.autoCapture = settings.autoCapture
+      if (settings.requireConfirmation !== undefined) config.requireConfirmation = settings.requireConfirmation
+      saveConfig(config)
+      return true
+    } catch {
+      return false
+    }
+  })
+  
+  // Safety — read near-misses log
+  ipcMain.handle('safety:nearMisses', () => {
+    const workspace = getWorkspacePath()
+    const logPath = path.join(workspace, 'logs', 'near-misses.json')
+    if (!fs.existsSync(logPath)) return []
+    try {
+      return JSON.parse(fs.readFileSync(logPath, 'utf-8'))
+    } catch { return [] }
+  })
+  
+  // Safety — read learned constraints
+  ipcMain.handle('safety:constraints', () => {
+    const workspace = getWorkspacePath()
+    const constraintsPath = path.join(workspace, 'memory', 'constraints.json')
+    if (!fs.existsSync(constraintsPath)) return []
+    try {
+      return JSON.parse(fs.readFileSync(constraintsPath, 'utf-8'))
+    } catch { return [] }
+  })
+  
+  // History — read conversation logs
+  ipcMain.handle('history:list', () => {
+    const workspace = getWorkspacePath()
+    const logsPath = path.join(workspace, 'logs', 'conversations')
+    if (!fs.existsSync(logsPath)) return []
+    const sessions: any[] = []
+    const entries = fs.readdirSync(logsPath)
+    for (const entry of entries) {
+      if (!entry.endsWith('.json')) continue
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(logsPath, entry), 'utf-8'))
+        sessions.push(data)
+      } catch { /* skip corrupt files */ }
+    }
+    return sessions.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+  })
+  
+  // History — read a specific conversation
+  ipcMain.handle('history:get', (_, sessionId: string) => {
+    const workspace = getWorkspacePath()
+    const filePath = path.join(workspace, 'logs', 'conversations', `${sessionId}.json`)
+    if (!fs.existsSync(filePath)) return null
+    try {
+      return JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+    } catch { return null }
+  })
+  
+  // History — export session as markdown
+  ipcMain.handle('history:export', (_, sessionId: string) => {
+    const workspace = getWorkspacePath()
+    const filePath = path.join(workspace, 'logs', 'conversations', `${sessionId}.json`)
+    if (!fs.existsSync(filePath)) return null
+    try {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+      let md = `# Conversation Export\n\n**Session:** ${sessionId}\n**Date:** ${new Date(data.timestamp || 0).toISOString()}\n**Messages:** ${data.messages?.length || 0}\n\n---\n\n`
+      for (const msg of data.messages || []) {
+        const role = msg.role === 'user' ? '👤 **User**' : msg.role === 'assistant' ? '🤖 **Agent**' : '⚙️ **System**'
+        md += `${role}\n${msg.content}\n\n`
+      }
+      const exportPath = path.join(getAppDataPath(), 'exports')
+      if (!fs.existsSync(exportPath)) fs.mkdirSync(exportPath, { recursive: true })
+      const exportFile = path.join(exportPath, `${sessionId}.md`)
+      fs.writeFileSync(exportFile, md, 'utf-8')
+      return exportFile
+    } catch (err) { return null }
   })
 }
 

@@ -1,12 +1,15 @@
-import { MessageSquare, Brain, Wrench, Clock, User, Settings, FolderOpen, Power, Network } from 'lucide-react'
+import { LayoutDashboard, MessageSquare, Brain, Wrench, Clock, User, Settings, FolderOpen, Power, Network, History, Shield } from 'lucide-react'
 import { useStore } from '../store'
 
 const NAV_ITEMS = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'chat', label: 'Chat', icon: MessageSquare },
   { id: 'brain', label: 'Brain', icon: Network },
   { id: 'memory', label: 'Memory', icon: Brain },
+  { id: 'history', label: 'History', icon: History },
   { id: 'tools', label: 'Tools', icon: Wrench },
   { id: 'schedule', label: 'Schedule', icon: Clock },
+  { id: 'safety', label: 'Safety', icon: Shield },
   { id: 'identity', label: 'Identity', icon: User },
   { id: 'settings', label: 'Settings', icon: Settings },
 ]

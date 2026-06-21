@@ -54,7 +54,7 @@ export const useStore = create<AppState>((set) => ({
   enginePort: 0,
   setEngineState: (running, port) => set({ engineRunning: running, enginePort: port }),
   
-  activeView: 'chat',
+  activeView: 'dashboard',
   setActiveView: (v) => set({ activeView: v }),
   
   config: null,
