@@ -1154,16 +1154,27 @@ app.whenReady().then(() => {
   autoUpdater.allowPrerelease = false
 
   // Feed URL: GitHub releases from GreyrockStudios/lodestone-desktop
-  // electron-updater reads latest.yml (mac) from releases assets.
+  // electron-updater reads latest-mac.yml (mac) from releases assets.
   // For dev/unpublished builds, this silently fails — that's fine.
   autoUpdater.setFeedURL({
     provider: 'github',
     owner: 'GreyrockStudios',
     repo: 'lodestone-desktop',
+    // Use private token if available (for private repos)
+    // token: process.env.GH_TOKEN,
   })
+
+  // Log updater events for debugging
+  autoUpdater.logger = {
+    error: (msg: string) => console.error('[autoUpdater]', msg),
+    info: (msg: string) => console.info('[autoUpdater]', msg),
+    debug: (msg: string) => console.log('[autoUpdater]', msg),
+    warn: (msg: string) => console.warn('[autoUpdater]', msg),
+  }
 
   // Events
   autoUpdater.on('update-available', (info: any) => {
+    console.log('[autoUpdater] Update available:', info.version)
     mainWindow?.webContents.send('update:available', {
       version: info.version || 'unknown',
       releaseDate: info.releaseDate || '',
@@ -1171,6 +1182,7 @@ app.whenReady().then(() => {
   })
 
   autoUpdater.on('update-not-available', () => {
+    console.log('[autoUpdater] App is up to date')
     mainWindow?.webContents.send('update:not-available')
   })
 
@@ -1184,6 +1196,7 @@ app.whenReady().then(() => {
   })
 
   autoUpdater.on('update-downloaded', (info: any) => {
+    console.log('[autoUpdater] Update downloaded:', info.version)
     mainWindow?.webContents.send('update:downloaded', {
       version: info.version || 'unknown',
     })
@@ -1195,12 +1208,14 @@ app.whenReady().then(() => {
 
   autoUpdater.on('error', (err: Error) => {
     // Silently fail — don't bother user with update errors
+    // This is expected in dev mode or before first release
     console.error('[autoUpdater]', err.message)
   })
 
-  // Check for updates on startup (silently fails in dev)
+  // Check for updates on startup (silently fails in dev / before first release)
   autoUpdater.checkForUpdates().catch(() => {
-    // Dev mode or no releases yet — expected
+    // Dev mode, no releases yet, or offline — expected
+    console.log('[autoUpdater] No updates available (dev/offline/no releases)')
   })
 
   // Check every 4 hours

@@ -146,6 +146,12 @@ export function StatusBar({ onToggleLogViewer, onToggleFileWatcher, onToggleProf
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState(false)
   const [toolCallCount, setToolCallCount] = useState(0)
+  const [appVersion, setAppVersion] = useState('')
+
+  // Get app version on mount
+  useEffect(() => {
+    window.lodestone?.appVersion?.().then((v: string) => setAppVersion(v)).catch(() => {})
+  }, [])
 
   // Poll engine status + dashboard stats every 5 seconds
   const poll = useCallback(async () => {
@@ -232,7 +238,7 @@ export function StatusBar({ onToggleLogViewer, onToggleFileWatcher, onToggleProf
         flexShrink: 0,
       }}
     >
-      {/* Left: Engine status + Socket status */}
+      {/* Left: Engine status + Socket status + Version */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5">
           <StatusDot running={running} starting={false} />
@@ -252,6 +258,9 @@ export function StatusBar({ onToggleLogViewer, onToggleFileWatcher, onToggleProf
             <SocketStatusIndicator status={socketStatus} />
           </div>
         )}
+        <div className="flex items-center" style={{ opacity: 0.5, fontSize: 10 }}>
+          <span style={{ color: 'var(--text-dim)' }}>v{appVersion || '…'}</span>
+        </div>
       </div>
 
       {/* Center: Model name + Token counter */}
