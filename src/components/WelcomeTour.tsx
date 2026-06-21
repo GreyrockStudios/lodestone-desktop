@@ -1,51 +1,46 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
 
 // ─── Tour Steps ─────────────────────────────────────────────────────
 
 interface TourStep {
-  target: string
+  /** CSS attribute selector string (e.g. '[data-tour-agent-name]') */
+  selector: string
   title: string
   description: string
-  icon: React.ComponentType<{ className?: string }>
   placement: 'bottom' | 'right' | 'top'
 }
 
 const TOUR_STEPS: TourStep[] = [
   {
-    target: 'data-tour-agent-name',
+    selector: '[data-tour-agent-name]',
     title: 'Welcome to your agent!',
-    description: 'This is your agent\'s identity. It shows the name, status, and current model — everything at a glance.',
-    icon: Sparkles,
+    description: "This is your agent's identity. It shows the name, status, and current model — everything at a glance.",
     placement: 'right',
   },
   {
-    target: 'data-tour-nav-chat',
+    selector: '[data-tour-nav-item="chat"]',
     title: 'Chat with your agent',
     description: 'Send messages, ask questions, and watch your agent think in real time. Conversations are saved automatically.',
-    icon: Sparkles,
     placement: 'right',
   },
   {
-    target: 'data-tour-nav-brain',
+    selector: '[data-tour-nav-item="brain"]',
     title: 'See inside its mind',
-    description: 'The Brain view shows the agent\'s neural network — memories, decisions, and how knowledge connects together.',
-    icon: Sparkles,
+    description: "The Brain view shows the agent's neural network — memories, decisions, and how knowledge connects together.",
     placement: 'right',
   },
   {
-    target: 'data-tour-nav-tools',
+    selector: '[data-tour-nav-item="tools"]',
     title: '39 tools at your disposal',
     description: 'Your agent comes with dozens of built-in tools — web search, memory, scheduling, and more. Browse and toggle them here.',
-    icon: Sparkles,
     placement: 'right',
   },
   {
-    target: 'data-tour-nav-safety',
-    title: 'You\'re in control',
-    description: 'Set guardrails, review near-misses, and constrain what your agent can do. Safety settings keep you in the driver\'s seat.',
-    icon: Sparkles,
+    selector: '[data-tour-nav-item="safety"]',
+    title: "You're in control",
+    description: "Set guardrails, review near-misses, and constrain what your agent can do. Safety settings keep you in the driver's seat.",
     placement: 'right',
   },
 ]
@@ -65,13 +60,13 @@ export function WelcomeTour({ onComplete }: { onComplete: () => void }) {
 
   // Measure the highlighted element
   const measureTarget = useCallback(() => {
-    const el = document.querySelector(`[${step.target}]`) as HTMLElement | null
+    const el = document.querySelector(step.selector) as HTMLElement | null
     if (el) {
       setTargetRect(el.getBoundingClientRect())
     } else {
       setTargetRect(null)
     }
-  }, [step.target])
+  }, [step.selector])
 
   useEffect(() => {
     measureTarget()
@@ -98,7 +93,11 @@ export function WelcomeTour({ onComplete }: { onComplete: () => void }) {
 
   const dismiss = useCallback(() => {
     setDismissed(true)
-    localStorage.setItem(STORAGE_KEY, 'true')
+    try {
+      localStorage.setItem(STORAGE_KEY, 'true')
+    } catch {
+      // localStorage may be unavailable in some contexts
+    }
     onComplete()
   }, [onComplete])
 
@@ -120,7 +119,6 @@ export function WelcomeTour({ onComplete }: { onComplete: () => void }) {
 
   // Click on overlay (outside tooltip) dismisses
   const handleOverlayClick = useCallback((e: React.MouseEvent) => {
-    // Only dismiss if clicking the overlay itself, not the tooltip card
     if (e.target === overlayRef.current) {
       dismiss()
     }
@@ -128,7 +126,6 @@ export function WelcomeTour({ onComplete }: { onComplete: () => void }) {
 
   if (!targetRect) return null
 
-  // Calculate tooltip position
   const tooltipPos = getTooltipPosition(targetRect, step.placement)
 
   return (
@@ -257,7 +254,7 @@ export function WelcomeTour({ onComplete }: { onComplete: () => void }) {
             </div>
 
             {/* Arrow pointing to target */}
-            <TourArrow position={tooltipPos.arrowPos} placement={step.placement} />
+            <TourArrow placement={step.placement} arrowPos={tooltipPos.arrowPos} />
           </motion.div>
         </motion.div>
       )}
@@ -283,7 +280,6 @@ function CutoutOverlay({ targetRect }: { targetRect: DOMRect }) {
     >
       <defs>
         <mask id="tour-cutout-mask">
-          {/* White = visible overlay, Black = transparent (cutout) */}
           <rect width="100%" height="100%" fill="white" />
           <rect
             x={targetRect.x - padding}
@@ -320,30 +316,91 @@ function CutoutOverlay({ targetRect }: { targetRect: DOMRect }) {
 
 // ─── Tour Arrow ──────────────────────────────────────────────────────
 
-function TourArrow({ position, placement }: { position: 'left' | 'right' | 'top' | 'bottom'; placement: string }) {
+function TourArrow({ placement, arrowPos }: {
+  placement: 'bottom' | 'right' | 'top'
+  arrowPos: 'left' | 'right' | 'top' | 'bottom'
+}) {
   const arrowColor = 'var(--border-hover)'
   const arrowGlow = 'rgba(139, 92, 246, 0.3)'
 
-  if (placement === 'right') {
-    // Arrow points left (toward sidebar element)
+  if (placement === 'right' && arrowPos === 'left') {
+    // Tooltip is to the right of target, arrow points left
     return (
       <div
         style={{
           position: 'absolute',
           left: -7,
-          top: position === 'top' ? 24 : position === 'bottom' ? 'auto' : '50%',
-          bottom: position === 'bottom' ? 24 : 'auto',
-          transform: position === 'left' ? 'translateY(-50%)' : 'none',
+          top: '50%',
+          transform: 'translateY(-50%)',
           width: 0,
           height: 0,
           borderTop: '7px solid transparent',
           borderBottom: '7px solid transparent',
-          borderRight: `7px solid ${arrowColor}`,
+          borderRight: `7px solid var(--border-hover)`,
           filter: `drop-shadow(0 0 4px ${arrowGlow})`,
         }}
       />
     )
   }
+
+  if (placement === 'right' && arrowPos === 'right') {
+    // Tooltip is to the left of target, arrow points right
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          right: -7,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: 0,
+          height: 0,
+          borderTop: '7px solid transparent',
+          borderBottom: '7px solid transparent',
+          borderLeft: `7px solid ${arrowColor}`,
+          filter: `drop-shadow(0 0 4px ${arrowGlow})`,
+        }}
+      />
+    )
+  }
+
+  if (placement === 'bottom' && arrowPos === 'top') {
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          left: '50%',
+          top: -7,
+          transform: 'translateX(-50%)',
+          width: 0,
+          height: 0,
+          borderLeft: '7px solid transparent',
+          borderRight: '7px solid transparent',
+          borderBottom: `7px solid ${arrowColor}`,
+          filter: `drop-shadow(0 0 4px ${arrowGlow})`,
+        }}
+      />
+    )
+  }
+
+  if (placement === 'bottom' && arrowPos === 'bottom') {
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          left: '50%',
+          bottom: -7,
+          transform: 'translateX(-50%)',
+          width: 0,
+          height: 0,
+          borderLeft: '7px solid transparent',
+          borderRight: '7px solid transparent',
+          borderTop: `7px solid ${arrowColor}`,
+          filter: `drop-shadow(0 0 4px ${arrowGlow})`,
+        }}
+      />
+    )
+  }
+
   return null
 }
 
@@ -354,19 +411,16 @@ function getTooltipPosition(
   placement: 'bottom' | 'right' | 'top'
 ): { x: number; y: number; arrowPos: 'left' | 'right' | 'top' | 'bottom' } {
   const tooltipWidth = 320
-  const tooltipHeight = 220 // estimated
+  const tooltipHeight = 220
   const gap = 16
 
   if (placement === 'right') {
-    // Tooltip appears to the right of the target (sidebar items)
     let x = rect.right + gap
-    // If no room on right, flip to left
     let arrowPos: 'left' | 'right' = 'left'
     if (x + tooltipWidth > window.innerWidth - 16) {
       x = rect.left - tooltipWidth - gap
       arrowPos = 'right'
     }
-    // Vertically center on target, clamp to viewport
     let y = rect.top + rect.height / 2 - tooltipHeight / 2
     y = Math.max(16, Math.min(y, window.innerHeight - tooltipHeight - 16))
     return { x, y, arrowPos }
@@ -388,12 +442,12 @@ function getTooltipPosition(
   let x = rect.left + rect.width / 2 - tooltipWidth / 2
   x = Math.max(16, Math.min(x, window.innerWidth - tooltipWidth - 16))
   let y = rect.top - tooltipHeight - gap
-  let arrowPos: 'top' | 'bottom' = 'bottom'
+  let arrowPos2: 'top' | 'bottom' = 'bottom'
   if (y < 16) {
     y = rect.bottom + gap
-    arrowPos = 'top'
+    arrowPos2 = 'top'
   }
-  return { x, y, arrowPos }
+  return { x, y, arrowPos: arrowPos2 }
 }
 
 // ─── Helper: Check if tour should show ───────────────────────────────
