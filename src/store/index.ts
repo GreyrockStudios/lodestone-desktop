@@ -40,6 +40,7 @@ interface AppState {
 export interface AgentConfig {
   agentName: string
   personality: string
+  agentEmoji?: string
   llmProvider: string
   apiKey: string
   model: string
