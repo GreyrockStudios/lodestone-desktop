@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Wrench, Search, ChevronDown, ChevronRight, Shield, ShieldAlert } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Wrench, Search, ChevronDown, ChevronRight, Shield, ShieldAlert, Star, Clock } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface ToolInfo {
@@ -119,11 +119,59 @@ const CATEGORY_COLORS: Record<string, string> = {
   Orchestration: '#A855F7',
 }
 
+const FAVORITES_KEY = 'lodestone-tool-favorites'
+const RECENT_KEY = 'lodestone-tool-recent'
+const MAX_RECENT = 5
+
+function loadFavorites(): Set<string> {
+  try {
+    const raw = localStorage.getItem(FAVORITES_KEY)
+    if (raw) return new Set(JSON.parse(raw))
+  } catch {}
+  return new Set()
+}
+
+function saveFavorites(favs: Set<string>) {
+  try { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favs])) } catch {}
+}
+
+function loadRecent(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch {}
+  return []
+}
+
+function saveRecent(recent: string[]) {
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)) } catch {}
+}
+
 export function Tools() {
   const [tools, setTools] = useState<ToolInfo[]>(DEFAULT_TOOLS)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [favorites, setFavorites] = useState<Set<string>>(loadFavorites)
+  const [recent, setRecent] = useState<string[]>(loadRecent)
+
+  const toggleFavorite = useCallback((name: string) => {
+    setFavorites(prev => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      saveFavorites(next)
+      return next
+    })
+  }, [])
+
+  const trackUse = useCallback((name: string) => {
+    setRecent(prev => {
+      const next = [name, ...prev.filter(n => n !== name)].slice(0, MAX_RECENT)
+      saveRecent(next)
+      return next
+    })
+  }, [])
 
   const filtered = tools.filter(t => {
     const matchSearch = t.name.includes(search.toLowerCase()) || t.description.toLowerCase().includes(search.toLowerCase())
@@ -133,8 +181,11 @@ export function Tools() {
 
   const toggleTool = (name: string) => {
     setTools(tools.map(t => t.name === name ? { ...t, enabled: !t.enabled } : t))
+    trackUse(name)
   }
 
+  const favoriteTools = tools.filter(t => favorites.has(t.name))
+  const recentTools = recent.map(name => tools.find(t => t.name === name)).filter(Boolean) as ToolInfo[]
   const enabledCount = tools.filter(t => t.enabled).length
 
   return (
@@ -183,95 +234,195 @@ export function Tools() {
 
       {/* Tool list */}
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="flex flex-col gap-2">
-          {filtered.map(tool => {
-            const isExpanded = expanded === tool.name
-            const catColor = CATEGORY_COLORS[tool.category] || '#6B7280'
-            return (
-              <div
-                key={tool.name}
-                className="rounded-xl overflow-hidden transition-all"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-              >
-                <div
-                  className="p-3 flex items-center justify-between cursor-pointer"
-                  onClick={() => setExpanded(isExpanded ? null : tool.name)}
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${catColor}15` }}>
-                      {isExpanded ? <ChevronDown className="w-4 h-4" style={{ color: catColor }} /> : <ChevronRight className="w-4 h-4" style={{ color: catColor }} />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{tool.name}</span>
-                        <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: `${catColor}15`, color: catColor }}>
-                          {tool.category}
-                        </span>
-                        {tool.risky && (
-                          <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>
-                            <ShieldAlert className="w-3 h-3" /> risky
-                          </span>
-                        )}
-                        {tool.requiresAuth && (
-                          <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B' }}>
-                            <Shield className="w-3 h-3" /> auth
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{tool.description}</p>
-                    </div>
-                  </div>
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <Toggle on={tool.enabled} onClick={() => toggleTool(tool.name)} />
-                  </div>
-                </div>
-
-                {/* Expanded detail */}
-                <AnimatePresence>
-                  {isExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="px-4 pb-3 pt-1 border-t" style={{ borderColor: 'var(--border)' }}>
-                        {tool.params && tool.params.length > 0 ? (
-                          <>
-                            <p className="text-xs font-medium mb-2 mt-2" style={{ color: 'var(--text-muted)' }}>Parameters</p>
-                            <div className="flex flex-col gap-1.5">
-                              {tool.params.map(p => (
-                                <div key={p.name} className="flex items-start gap-2 text-xs" style={{ fontFamily: 'SF Mono, Fira Code, monospace' }}>
-                                  <span style={{ color: p.required ? '#EF4444' : 'var(--text-dim)' }}>
-                                    {p.required ? '*' : ' '} {p.name}:
-                                  </span>
-                                  <span style={{ color: '#06B6D4' }}>{p.type}</span>
-                                  <span style={{ color: 'var(--text-muted)' }}>— {p.description}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </>
-                        ) : (
-                          <p className="text-xs mt-2" style={{ color: 'var(--text-dim)' }}>No parameters required.</p>
-                        )}
-                        {tool.example && (
-                          <>
-                            <p className="text-xs font-medium mb-1 mt-3" style={{ color: 'var(--text-muted)' }}>Example</p>
-                            <pre className="text-xs p-2 rounded-lg overflow-x-auto" style={{ background: 'var(--bg-elevated)', color: 'var(--text-muted)', fontFamily: 'SF Mono, Fira Code, monospace' }}>
-                              {tool.example}
-                            </pre>
-                          </>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+        <div className="flex flex-col gap-4">
+          {/* Favorites section */}
+          {favoriteTools.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Star className="w-3.5 h-3.5" style={{ color: '#F59E0B', fill: '#F59E0B' }} />
+                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-dim)' }}>
+                  Favorites ({favoriteTools.length})
+                </span>
+                <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
               </div>
-            )
-          })}
+              <div className="flex flex-col gap-2">
+                {favoriteTools.map(tool => (
+                  <ToolCard
+                    key={tool.name}
+                    tool={tool}
+                    expanded={expanded === tool.name}
+                    onToggle={() => setExpanded(expanded === tool.name ? null : tool.name)}
+                    onToggleEnabled={toggleTool}
+                    isFavorite={favorites.has(tool.name)}
+                    onToggleFavorite={() => toggleFavorite(tool.name)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Recently Used section */}
+          {recentTools.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="w-3.5 h-3.5" style={{ color: '#06B6D4' }} />
+                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-dim)' }}>
+                  Recently Used
+                </span>
+                <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
+              </div>
+              <div className="flex flex-col gap-2">
+                {recentTools.map(tool => (
+                  <ToolCard
+                    key={`recent-${tool.name}`}
+                    tool={tool}
+                    expanded={expanded === tool.name}
+                    onToggle={() => setExpanded(expanded === tool.name ? null : tool.name)}
+                    onToggleEnabled={toggleTool}
+                    isFavorite={favorites.has(tool.name)}
+                    onToggleFavorite={() => toggleFavorite(tool.name)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* All tools */}
+          <div>
+            {(favoriteTools.length > 0 || recentTools.length > 0) && (
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-dim)' }}>
+                  All Tools
+                </span>
+                <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
+              </div>
+            )}
+            <div className="flex flex-col gap-2">
+              {filtered.map(tool => (
+                <ToolCard
+                  key={tool.name}
+                  tool={tool}
+                  expanded={expanded === tool.name}
+                  onToggle={() => setExpanded(expanded === tool.name ? null : tool.name)}
+                  onToggleEnabled={toggleTool}
+                  isFavorite={favorites.has(tool.name)}
+                  onToggleFavorite={() => toggleFavorite(tool.name)}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── Tool Card ───────────────────────────────────────────────────────
+
+function ToolCard({ tool, expanded, onToggle, onToggleEnabled, isFavorite, onToggleFavorite }: {
+  tool: ToolInfo
+  expanded: boolean
+  onToggle: () => void
+  onToggleEnabled: (name: string) => void
+  isFavorite: boolean
+  onToggleFavorite: () => void
+}) {
+  const catColor = CATEGORY_COLORS[tool.category] || '#6B7280'
+  return (
+    <div
+      className="rounded-xl overflow-hidden transition-all"
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+    >
+      <div
+        className="p-3 flex items-center justify-between cursor-pointer"
+        onClick={onToggle}
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${catColor}15` }}>
+            {expanded ? <ChevronDown className="w-4 h-4" style={{ color: catColor }} /> : <ChevronRight className="w-4 h-4" style={{ color: catColor }} />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{tool.name}</span>
+              <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: `${catColor}15`, color: catColor }}>
+                {tool.category}
+              </span>
+              {tool.risky && (
+                <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>
+                  <ShieldAlert className="w-3 h-3" /> risky
+                </span>
+              )}
+              {tool.requiresAuth && (
+                <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B' }}>
+                  <Shield className="w-3 h-3" /> auth
+                </span>
+              )}
+            </div>
+            <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{tool.description}</p>
+          </div>
+        </div>
+
+        {/* Star + Toggle */}
+        <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={onToggleFavorite}
+            className="p-1.5 rounded-lg transition-all"
+            style={{ background: 'transparent' }}
+            title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            <Star
+              className="w-4 h-4"
+              style={{
+                color: isFavorite ? '#F59E0B' : 'var(--text-dim)',
+                fill: isFavorite ? '#F59E0B' : 'none',
+              }}
+            />
+          </button>
+          <Toggle on={tool.enabled} onClick={() => onToggleEnabled(tool.name)} />
+        </div>
+      </div>
+
+      {/* Expanded detail */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-3 pt-1 border-t" style={{ borderColor: 'var(--border)' }}>
+              {tool.params && tool.params.length > 0 ? (
+                <>
+                  <p className="text-xs font-medium mb-2 mt-2" style={{ color: 'var(--text-muted)' }}>Parameters</p>
+                  <div className="flex flex-col gap-1.5">
+                    {tool.params.map(p => (
+                      <div key={p.name} className="flex items-start gap-2 text-xs" style={{ fontFamily: 'SF Mono, Fira Code, monospace' }}>
+                        <span style={{ color: p.required ? '#EF4444' : 'var(--text-dim)' }}>
+                          {p.required ? '*' : ' '} {p.name}:
+                        </span>
+                        <span style={{ color: '#06B6D4' }}>{p.type}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>— {p.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs mt-2" style={{ color: 'var(--text-dim)' }}>No parameters required.</p>
+              )}
+              {tool.example && (
+                <>
+                  <p className="text-xs font-medium mb-1 mt-3" style={{ color: 'var(--text-muted)' }}>Example</p>
+                  <pre className="text-xs p-2 rounded-lg overflow-x-auto" style={{ background: 'var(--bg-elevated)', color: 'var(--text-muted)', fontFamily: 'SF Mono, Fira Code, monospace' }}>
+                    {tool.example}
+                  </pre>
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

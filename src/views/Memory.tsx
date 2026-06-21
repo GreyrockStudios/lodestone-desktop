@@ -7,6 +7,8 @@ import {
   TrendingUp, Database, Hash, Sparkles,
 } from 'lucide-react'
 import { useStore } from '../store'
+import { KnowledgeBrowser } from '../components/KnowledgeBrowser'
+import { MemoryCompactor } from '../components/MemoryCompactor'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -41,7 +43,7 @@ interface DecisionItem {
   context?: string
 }
 
-type TabType = 'memories' | 'wiki' | 'timeline' | 'decisions'
+type TabType = 'memories' | 'wiki' | 'timeline' | 'decisions' | 'knowledge'
 type SortType = 'recent' | 'oldest' | 'az' | 'relevance'
 type FilterType = 'all' | MemoryCategory
 
@@ -243,6 +245,7 @@ export function Memory() {
           <TabButton active={tab === 'wiki'} onClick={() => setTab('wiki')} label={`Wiki (${wikiPages.length})`} />
           <TabButton active={tab === 'timeline'} onClick={() => setTab('timeline')} label="Timeline" icon={Clock} />
           <TabButton active={tab === 'decisions'} onClick={() => setTab('decisions')} label={`Decisions (${decisions.length})`} icon={Gavel} />
+          <TabButton active={tab === 'knowledge'} onClick={() => setTab('knowledge')} label="Knowledge" icon={FileText} />
         </div>
 
         {/* Search + Filters */}
@@ -276,6 +279,11 @@ export function Memory() {
             <SortDropdown value={sortBy} onChange={setSortBy} />
           </div>
         </div>
+      </div>
+
+      {/* Memory Compactor Card */}
+      <div className="px-4 pt-4">
+        <MemoryCompactor />
       </div>
 
       {/* ─── Content ─────────────────────────────────────────────── */}
@@ -325,6 +333,10 @@ export function Memory() {
           ) : tab === 'timeline' ? (
             <motion.div key="timeline" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
               <MemoryTimeline memories={filteredMemories} />
+            </motion.div>
+          ) : tab === 'knowledge' ? (
+            <motion.div key="knowledge" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="h-full">
+              <KnowledgeBrowser />
             </motion.div>
           ) : (
             <motion.div key="decisions" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>

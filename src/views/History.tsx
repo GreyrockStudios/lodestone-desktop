@@ -1,6 +1,53 @@
 import { useState, useMemo, useEffect } from 'react'
-import { History as HistoryIcon, Search, Download, ChevronDown, ChevronRight, MessageSquare, Wrench, Calendar, Trash2, Inbox } from 'lucide-react'
+import { History as HistoryIcon, Search, Download, ChevronDown, ChevronRight, MessageSquare, Wrench, Calendar, Trash2, Inbox, BookOpen, GitCompare } from 'lucide-react'
 import { useStore, type ChatMessage } from '../store'
+import { AgentJournal } from '../components/AgentJournal'
+import { DiffViewer } from '../components/DiffViewer'
+
+// ─── Highlight helper ─────────────────────────────────────────────────
+
+function highlightText(text: string, query: string): React.ReactNode {
+  if (!query.trim()) return text
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
+  return parts.map((part, i) =>
+    part.toLowerCase() === query.toLowerCase()
+      ? <mark key={i} style={{ background: 'rgba(139, 92, 246, 0.25)', color: 'var(--text)', borderRadius: 2, padding: '0 1px' }}>{part}</mark>
+      : part
+  )
+}
+
+// ─── Date range filter ───────────────────────────────────────────────
+
+type DateRange = 'today' | 'week' | 'month' | 'all'
+
+const DATE_RANGES: { key: DateRange; label: string }[] = [
+  { key: 'today', label: 'Today' },
+  { key: 'week', label: 'This Week' },
+  { key: 'month', label: 'This Month' },
+  { key: 'all', label: 'All Time' },
+]
+
+function isInDateRange(ts: number, range: DateRange): boolean {
+  const now = new Date()
+  const item = new Date(ts)
+  switch (range) {
+    case 'today':
+      return item.toDateString() === now.toDateString()
+    case 'week': {
+      const weekAgo = new Date(now)
+      weekAgo.setDate(weekAgo.getDate() - 7)
+      return item >= weekAgo
+    }
+    case 'month': {
+      const monthAgo = new Date(now)
+      monthAgo.setMonth(monthAgo.getMonth() - 1)
+      return item >= monthAgo
+    }
+    case 'all':
+      return true
+  }
+}
 
 interface Session {
   id: string
@@ -101,8 +148,10 @@ function downloadMarkdown(filename: string, content: string) {
 export function History() {
   const { messages, engineRunning } = useStore()
   const [search, setSearch] = useState('')
+  const [dateRange, setDateRange] = useState<DateRange>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<Session[]>(MOCK_SESSIONS)
+  const [subView, setSubView] = useState<'sessions' | 'journal' | 'diff'>('sessions')
 
   // Build sessions from current messages (for live view)
   useEffect(() => {
@@ -123,12 +172,19 @@ export function History() {
   }, [messages])
 
   const filteredSessions = useMemo(() => {
-    if (!search.trim()) return sessions
-    const q = search.toLowerCase()
-    return sessions.filter(s =>
-      s.messages.some(m => m.content.toLowerCase().includes(q))
-    )
-  }, [sessions, search])
+    let result = sessions
+    // Date range filter
+    result = result.filter(s => isInDateRange(s.startTime, dateRange))
+    // Full-text search
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter(s =>
+        s.messages.some(m => m.content.toLowerCase().includes(q)) ||
+        s.id.toLowerCase().includes(q)
+      )
+    }
+    return result
+  }, [sessions, search, dateRange])
 
   const grouped = useMemo(() => groupSessionsByDate(filteredSessions), [filteredSessions])
 
@@ -162,22 +218,85 @@ export function History() {
           <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--bg-elevated)', color: 'var(--text-muted)' }}>
             {sessions.length} {sessions.length === 1 ? 'session' : 'sessions'}
           </span>
+          {/* Sub-view toggle */}
+          <div className="flex gap-1 ml-auto">
+            <button
+              onClick={() => setSubView('sessions')}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all"
+              style={{
+                background: subView === 'sessions' ? 'rgba(139, 92, 246, 0.1)' : 'transparent',
+                color: subView === 'sessions' ? 'var(--accent)' : 'var(--text-muted)',
+                border: `1px solid ${subView === 'sessions' ? 'rgba(139, 92, 246, 0.3)' : 'var(--border)'}`,
+              }}
+            >
+              <HistoryIcon className="w-3.5 h-3.5" />
+              Sessions
+            </button>
+            <button
+              onClick={() => setSubView('journal')}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all"
+              style={{
+                background: subView === 'journal' ? 'rgba(139, 92, 246, 0.1)' : 'transparent',
+                color: subView === 'journal' ? 'var(--accent)' : 'var(--text-muted)',
+                border: `1px solid ${subView === 'journal' ? 'rgba(139, 92, 246, 0.3)' : 'var(--border)'}`,
+              }}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              Journal
+            </button>
+          </div>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-dim)' }} />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search conversations..."
-            className="w-full pl-9 pr-3 py-2 rounded-lg text-sm"
-            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text)' }}
-          />
-        </div>
+        {/* Search (only in sessions view) */}
+        {subView === 'sessions' && (
+          <>
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-dim)' }} />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search conversations..."
+                className="w-full pl-9 pr-3 py-2 rounded-lg text-sm"
+                style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text)' }}
+              />
+            </div>
+            {/* Date range filter */}
+            <div className="flex items-center gap-1">
+              {DATE_RANGES.map(r => (
+                <button
+                  key={r.key}
+                  onClick={() => setDateRange(r.key)}
+                  className="px-2.5 py-1 rounded-lg text-xs transition-all"
+                  style={{
+                    background: dateRange === r.key ? 'rgba(139, 92, 246, 0.1)' : 'transparent',
+                    color: dateRange === r.key ? 'var(--accent)' : 'var(--text-muted)',
+                    border: `1px solid ${dateRange === r.key ? 'rgba(139, 92, 246, 0.3)' : 'var(--border)'}`,
+                  }}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
+      {/* Journal view */}
+      {subView === 'journal' ? (
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="max-w-2xl mx-auto h-full">
+            <AgentJournal />
+          </div>
+        </div>
+      ) : subView === 'diff' ? (
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="max-w-3xl mx-auto">
+            <DiffViewer />
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Session list */}
       <div className="flex-1 overflow-y-auto p-4">
         {filteredSessions.length === 0 ? (
@@ -210,6 +329,7 @@ export function History() {
                       expanded={expandedId === s.id}
                       onToggle={() => setExpandedId(expandedId === s.id ? null : s.id)}
                       onExport={() => handleExport(s)}
+                      search={search}
                     />
                   ))}
                 </div>
@@ -218,15 +338,18 @@ export function History() {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   )
 }
 
-function SessionCard({ session, expanded, onToggle, onExport }: {
+function SessionCard({ session, expanded, onToggle, onExport, search }: {
   session: Session
   expanded: boolean
   onToggle: () => void
   onExport: () => void
+  search: string
 }) {
   const userMessages = session.messages.filter(m => m.role === 'user').length
   const assistantMessages = session.messages.filter(m => m.role === 'assistant').length
@@ -242,7 +365,7 @@ function SessionCard({ session, expanded, onToggle, onExport }: {
           <MessageSquare className="w-4 h-4" style={{ color: 'var(--accent)' }} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{getSessionPreview(session)}</p>
+          <p className="text-sm font-medium truncate">{highlightText(getSessionPreview(session), search)}</p>
           <div className="flex items-center gap-3 mt-1">
             <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{formatTime(session.startTime)}</span>
             <span className="text-xs" style={{ color: 'var(--text-dim)' }}>·</span>

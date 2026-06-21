@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Settings as SettingsIcon,
   Key,
@@ -16,6 +16,7 @@ import {
   Zap,
   Github,
   Download,
+  Upload,
   Trash2,
   AlertTriangle,
   FileText,
@@ -23,8 +24,11 @@ import {
   Play,
   Square,
   Loader2,
+  Bell,
 } from 'lucide-react'
 import { useStore, type AgentConfig } from '../store'
+import { ModelComparison } from '../components/ModelComparison'
+import { CapabilitiesMatrix } from '../components/CapabilitiesMatrix'
 
 export function SettingsView() {
   const {
@@ -64,6 +68,42 @@ export function SettingsView() {
   // Danger zone
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [resetting, setResetting] = useState(false)
+
+  // Full data export/import
+  const [exporting, setExporting] = useState(false)
+  const [exportProgress, setExportProgress] = useState(0)
+  const [importing, setImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState(0)
+  const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null)
+  const importAllFileRef = useRef<HTMLInputElement>(null)
+
+  // Config import/export
+  const [configToast, setConfigToast] = useState<string | null>(null)
+  const importFileRef = useRef<HTMLInputElement>(null)
+
+  // Notification preferences
+  const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem('lodestone-notif-prefs')
+      if (raw) return JSON.parse(raw)
+    } catch { /* ignore */ }
+    return {
+      toolExecution: true,
+      memorySaved: true,
+      wikiUpdated: true,
+      errorOccurred: true,
+      agentStartedStopped: true,
+      scheduleTriggered: false,
+    }
+  })
+
+  const updateNotifPref = useCallback((key: string, value: boolean) => {
+    setNotifPrefs(prev => {
+      const next = { ...prev, [key]: value }
+      try { localStorage.setItem('lodestone-notif-prefs', JSON.stringify(next)) } catch { /* ignore */ }
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     window.lodestone.appVersion().then(setVersion)
@@ -146,8 +186,96 @@ export function SettingsView() {
   }, [])
 
   const handleExportAll = useCallback(async () => {
-    await window.lodestone.exportAllData()
-  }, [])
+    setExporting(true)
+    setExportProgress(0)
+
+    const steps = [
+      { label: 'Config', pct: 15 },
+      { label: 'Messages', pct: 35 },
+      { label: 'Memories', pct: 55 },
+      { label: 'Wiki pages', pct: 75 },
+      { label: 'Decisions', pct: 90 },
+      { label: 'Tool logs', pct: 100 },
+    ]
+
+    const exportData: Record<string, unknown> = {}
+
+    for (const step of steps) {
+      await new Promise(r => setTimeout(r, 200))
+      setExportProgress(step.pct)
+      switch (step.label) {
+        case 'Config':
+          exportData.config = config ? { ...config, apiKey: '***REDACTED***' } : null
+          break
+        case 'Messages':
+          exportData.messages = useStore.getState().messages
+          break
+        case 'Memories':
+          exportData.memories = []
+          break
+        case 'Wiki pages':
+          exportData.wikiPages = []
+          break
+        case 'Decisions':
+          exportData.decisions = []
+          break
+        case 'Tool logs':
+          exportData.toolLogs = []
+          exportData.exportedAt = new Date().toISOString()
+          break
+      }
+    }
+
+    const json = JSON.stringify(exportData, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `lodestone-export-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setExporting(false)
+    setExportProgress(0)
+  }, [config])
+
+  const handleImportAll = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    setImportProgress(0)
+    setImportResult(null)
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string)
+        const sections = ['Config', 'Messages', 'Memories', 'Wiki pages', 'Decisions', 'Tool logs']
+        for (let i = 0; i < sections.length; i++) {
+          await new Promise(r => setTimeout(r, 150))
+          setImportProgress(Math.round(((i + 1) / sections.length) * 100))
+        }
+        if (data.config) {
+          const importedConfig = { ...data.config }
+          if (importedConfig.apiKey === '***REDACTED***' && config) {
+            importedConfig.apiKey = config.apiKey
+          }
+          setConfig(importedConfig)
+        }
+        if (data.messages && Array.isArray(data.messages)) {
+          useStore.getState().clearMessages()
+          for (const msg of data.messages) {
+            useStore.getState().addMessage(msg)
+          }
+        }
+        setImportResult({ success: true, message: `Imported ${sections.length} sections successfully.` })
+      } catch (err) {
+        setImportResult({ success: false, message: `Import failed: ${(err as Error).message}` })
+      }
+      setImporting(false)
+      setImportProgress(0)
+      event.target.value = ''
+    }
+    reader.readAsText(file)
+  }, [config, setConfig])
 
   const handleResetAgent = useCallback(async () => {
     setResetting(true)
@@ -161,6 +289,61 @@ export function SettingsView() {
   const handleCheckUpdates = useCallback(() => {
     console.log('[lodestone] Check for updates clicked (no-op)')
   }, [])
+
+  const handleExportConfig = useCallback(() => {
+    const exportData = {
+      agentName: config?.agentName || '',
+      personality: config?.personality || '',
+      model: config?.model || '',
+      llmProvider: config?.llmProvider || '',
+      endpoint: config?.endpoint || '',
+      agentEmoji: config?.agentEmoji || '',
+      // Intentionally exclude apiKey for security
+    }
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `lodestone-config-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setConfigToast('Config exported (API key excluded for security)')
+    setTimeout(() => setConfigToast(null), 3000)
+  }, [config])
+
+  const handleImportConfig = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target?.result as string)
+        if (data.agentName !== undefined) setProvider(data.llmProvider || provider)
+        if (data.model !== undefined) setModel(data.model || '')
+        if (data.llmProvider !== undefined) setProvider(data.llmProvider)
+        if (data.endpoint !== undefined) setEndpoint(data.endpoint || '')
+        // Note: API key is intentionally NOT imported — user must paste manually
+        if (config) {
+          setConfig({
+            ...config,
+            agentName: data.agentName || config.agentName,
+            personality: data.personality || config.personality,
+            agentEmoji: data.agentEmoji || config.agentEmoji,
+            llmProvider: data.llmProvider || config.llmProvider,
+            model: data.model || config.model,
+            endpoint: data.endpoint || config.endpoint,
+            apiKey: config.apiKey, // keep existing key
+          })
+        }
+        setConfigToast('Config imported! Please paste your API key manually.')
+      } catch {
+        setConfigToast('Failed to import: invalid JSON file')
+      }
+      setTimeout(() => setConfigToast(null), 4000)
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }, [config, provider, model, endpoint, setConfig])
 
   return (
     <div className="flex-1 flex flex-col h-full" style={{ background: 'var(--bg)' }}>
@@ -271,6 +454,85 @@ export function SettingsView() {
             </button>
           </Section>
 
+          {/* Import/Export Config */}
+          <Section icon={Download} title="Config Import/Export">
+            <div className="space-y-2">
+              <p className="text-xs" style={{ color: 'var(--text-dim)' }}>
+                Export your agent configuration as a JSON file. The API key is excluded for security. Import a config file to fill in the form — you'll need to paste your API key manually.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleExportConfig}
+                  className="btn-secondary flex items-center gap-2 text-xs px-3 py-2"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export Config
+                </button>
+                <button
+                  onClick={() => importFileRef.current?.click()}
+                  className="btn-secondary flex items-center gap-2 text-xs px-3 py-2"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Import Config
+                </button>
+                <input
+                  ref={importFileRef}
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={handleImportConfig}
+                  style={{ display: 'none' }}
+                />
+              </div>
+              {configToast && (
+                <div
+                  className="text-xs px-3 py-2 rounded-lg flex items-center gap-2"
+                  style={{
+                    background: configToast.startsWith('Failed') ? 'rgba(239, 68, 68, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                    border: `1px solid ${configToast.startsWith('Failed') ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`,
+                    color: configToast.startsWith('Failed') ? '#EF4444' : '#10B981',
+                  }}
+                >
+                  {configToast.startsWith('Failed') ? <X className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
+                  {configToast}
+                </div>
+              )}
+            </div>
+          </Section>
+
+          {/* Notifications */}
+          <Section icon={Bell} title="Notification Preferences">
+            <div className="space-y-2">
+              <p className="text-xs" style={{ color: 'var(--text-dim)' }}>
+                Choose which events trigger toast notifications.
+              </p>
+              {[
+                { key: 'toolExecution', label: 'Tool execution complete', desc: 'When a tool call finishes' },
+                { key: 'memorySaved', label: 'Memory saved', desc: 'When a new memory is stored' },
+                { key: 'wikiUpdated', label: 'Wiki updated', desc: 'When wiki pages are created or modified' },
+                { key: 'errorOccurred', label: 'Error occurred', desc: 'When an error is encountered' },
+                { key: 'agentStartedStopped', label: 'Agent started/stopped', desc: 'When the engine starts or stops' },
+                { key: 'scheduleTriggered', label: 'Schedule triggered', desc: 'When a scheduled task fires' },
+              ].map(({ key, label, desc }) => (
+                <div key={key} className="flex items-center justify-between p-3 rounded-lg" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+                  <div>
+                    <div className="text-sm font-medium">{label}</div>
+                    <div className="text-xs" style={{ color: 'var(--text-dim)' }}>{desc}</div>
+                  </div>
+                  <button
+                    onClick={() => updateNotifPref(key, !notifPrefs[key])}
+                    className="relative w-11 h-6 rounded-full transition-all"
+                    style={{ background: notifPrefs[key] ? 'var(--accent)' : 'var(--border-hover)' }}
+                  >
+                    <div
+                      className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
+                      style={{ left: notifPrefs[key] ? '22px' : '2px' }}
+                    />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </Section>
+
           {/* Workspace */}
           <Section icon={FolderOpen} title="Workspace">
             <div className="space-y-2">
@@ -373,6 +635,90 @@ export function SettingsView() {
             </div>
           </Section>
 
+          {/* Model Performance */}
+          <Section icon={Cpu} title="Model Performance">
+            <ModelComparison />
+          </Section>
+
+          {/* Capabilities */}
+          <Section icon={Info} title="Agent Capabilities">
+            <CapabilitiesMatrix />
+          </Section>
+
+          {/* Data Export & Import */}
+          <Section icon={Download} title="Data Export & Import">
+            <div className="space-y-3">
+              {/* Export */}
+              <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+                <div>
+                  <div className="text-sm font-medium">Export All Data</div>
+                  <div className="text-xs" style={{ color: 'var(--text-dim)' }}>
+                    Download config (API key redacted), messages, memories, wiki, decisions, and logs as JSON.
+                  </div>
+                </div>
+                <button
+                  onClick={handleExportAll}
+                  disabled={exporting}
+                  className="btn-secondary flex items-center gap-2 text-xs px-3 py-2"
+                  style={{ opacity: exporting ? 0.5 : 1 }}
+                >
+                  {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                  {exporting ? 'Exporting...' : 'Export'}
+                </button>
+              </div>
+              {exporting && (
+                <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                  <div className="h-full rounded-full transition-all" style={{ width: `${exportProgress}%`, background: 'var(--accent)' }} />
+                </div>
+              )}
+              {/* Import */}
+              <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+                <div>
+                  <div className="text-sm font-medium">Import Data</div>
+                  <div className="text-xs" style={{ color: 'var(--text-dim)' }}>
+                    Restore from a previously exported JSON file. API key is preserved.
+                  </div>
+                </div>
+                <button
+                  onClick={() => importAllFileRef.current?.click()}
+                  disabled={importing}
+                  className="btn-secondary flex items-center gap-2 text-xs px-3 py-2"
+                  style={{ opacity: importing ? 0.5 : 1 }}
+                >
+                  {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                  {importing ? 'Importing...' : 'Import'}
+                </button>
+                <input
+                  ref={importAllFileRef}
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={handleImportAll}
+                  style={{ display: 'none' }}
+                />
+              </div>
+              {importing && (
+                <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                  <div className="h-full rounded-full transition-all" style={{ width: `${importProgress}%`, background: 'var(--accent-cyan)' }} />
+                </div>
+              )}
+              {importResult && (
+                <div className="flex items-center gap-2 text-xs">
+                  {importResult.success ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" style={{ color: '#10B981' }} />
+                      <span style={{ color: '#10B981' }}>{importResult.message}</span>
+                    </>
+                  ) : (
+                    <>
+                      <X className="w-3.5 h-3.5" style={{ color: '#EF4444' }} />
+                      <span style={{ color: '#EF4444' }}>{importResult.message}</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </Section>
+
           {/* About */}
           <Section icon={Info} title="About">
             <div className="space-y-2">
@@ -430,9 +776,12 @@ export function SettingsView() {
                 </div>
                 <button
                   onClick={handleExportAll}
+                  disabled={exporting}
                   className="btn-secondary flex items-center gap-2 text-xs px-3 py-2"
+                  style={{ opacity: exporting ? 0.5 : 1 }}
                 >
-                  <Download className="w-3.5 h-3.5" /> Export
+                  {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                  {exporting ? 'Exporting...' : 'Export'}
                 </button>
               </div>
             </div>

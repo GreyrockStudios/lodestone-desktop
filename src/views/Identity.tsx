@@ -1,7 +1,12 @@
 import { useState, useMemo } from 'react'
-import { User, Save, Sparkles, Bot, Palette, Eye, RefreshCw } from 'lucide-react'
+import { User, Save, Sparkles, Bot, Palette, Eye, RefreshCw, FileText, Eye as EyeIcon, Grid3x3 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore, type AgentConfig } from '../store'
+import { marked } from 'marked'
+import { PersonalityLibrary, type PersonalityTemplate } from '../components/PersonalityLibrary'
+import { CapabilitiesMatrix } from '../components/CapabilitiesMatrix'
+
+marked.setOptions({ breaks: true, gfm: true })
 
 const PERSONALITY_PRESETS = [
   { name: 'Sharp Assistant', emoji: '🪨', desc: 'Direct, resourceful, no fluff. Gets things done without wasting time.',
@@ -22,7 +27,8 @@ const PERSONALITY_PRESETS = [
 
 const AVATAR_EMOJIS = ['🪨', '🔮', '⚡', '🧠', '🤖', '🦉', '🐙', '🦁', '🦊', '🐉', '🌟', '🌙', '🔬', '🎨', '📋', '🧘']
 
-type Tab = 'identity' | 'appearance' | 'preview'
+type Tab = 'identity' | 'appearance' | 'preview' | 'capabilities'
+type PreviewMode = 'edit' | 'split' | 'preview'
 
 export function Identity() {
   const { config, setConfig } = useStore()
@@ -32,6 +38,12 @@ export function Identity() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [tab, setTab] = useState<Tab>('identity')
+  const [previewMode, setPreviewMode] = useState<PreviewMode>('edit')
+
+  const renderedMarkdown = useMemo(() => {
+    if (!personality) return '<p style="color: var(--text-dim);">No personality set. The agent will use default behavior.</p>'
+    return marked.parse(personality) as string
+  }, [personality])
 
   const selectedPreset = useMemo(() => {
     return PERSONALITY_PRESETS.find(p => p.prompt === personality) || PERSONALITY_PRESETS[PERSONALITY_PRESETS.length - 1]
@@ -54,6 +66,11 @@ export function Identity() {
     }
   }
 
+  const applyTemplate = (template: PersonalityTemplate) => {
+    setPersonality(template.samplePrompt)
+    setName(prev => prev || template.name)
+  }
+
   return (
     <div className="flex-1 flex flex-col h-full" style={{ background: 'var(--bg)' }}>
       {/* Header */}
@@ -68,6 +85,7 @@ export function Identity() {
           <TabButton active={tab === 'identity'} onClick={() => setTab('identity')} icon={Bot} label="Personality" />
           <TabButton active={tab === 'appearance'} onClick={() => setTab('appearance')} icon={Palette} label="Appearance" />
           <TabButton active={tab === 'preview'} onClick={() => setTab('preview')} icon={Eye} label="Preview" />
+          <TabButton active={tab === 'capabilities'} onClick={() => setTab('capabilities')} icon={Grid3x3} label="Capabilities" />
         </div>
       </div>
 
@@ -83,10 +101,13 @@ export function Identity() {
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-6"
               >
+                {/* Personality Library */}
+                <PersonalityLibrary onSelect={applyTemplate} selectedName={selectedPreset.name !== 'Custom' ? selectedPreset.name : undefined} />
+
                 {/* Presets */}
                 <div>
                   <label className="text-sm font-medium mb-3 block" style={{ color: 'var(--text)' }}>
-                    Personality Presets
+                    Quick Presets
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     {PERSONALITY_PRESETS.map(preset => {
@@ -127,22 +148,81 @@ export function Identity() {
                   <p className="text-xs mt-1" style={{ color: 'var(--text-dim)' }}>This is how your agent identifies itself.</p>
                 </div>
 
-                {/* Personality editor */}
+                {/* Personality editor with markdown preview */}
                 <div>
-                  <label className="text-sm font-medium mb-2 block" style={{ color: 'var(--text)' }}>
-                    Personality Description
-                  </label>
-                  <textarea
-                    value={personality}
-                    onChange={(e) => setPersonality(e.target.value)}
-                    placeholder="Describe your agent's personality... e.g. 'You are a sharp, concise research assistant who speaks in bullet points and always cites sources.'"
-                    rows={6}
-                    className="w-full px-4 py-3 rounded-xl text-sm resize-none outline-none"
-                    style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text)' }}
-                  />
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium block" style={{ color: 'var(--text)' }}>
+                      Personality Description
+                    </label>
+                    {/* Preview toggle buttons */}
+                    <div className="flex items-center gap-1" style={{
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      padding: 2,
+                    }}>
+                      <PreviewModeButton
+                        active={previewMode === 'edit'}
+                        onClick={() => setPreviewMode('edit')}
+                        icon={FileText}
+                        label="Edit"
+                      />
+                      <PreviewModeButton
+                        active={previewMode === 'split'}
+                        onClick={() => setPreviewMode('split')}
+                        icon={EyeIcon}
+                        label="Split"
+                      />
+                      <PreviewModeButton
+                        active={previewMode === 'preview'}
+                        onClick={() => setPreviewMode('preview')}
+                        icon={Eye}
+                        label="Preview"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Editor / Preview area */}
+                  {previewMode === 'edit' && (
+                    <textarea
+                      value={personality}
+                      onChange={(e) => setPersonality(e.target.value)}
+                      placeholder="Describe your agent's personality... e.g. 'You are a sharp, concise research assistant who speaks in bullet points and always cites sources.'"
+                      rows={6}
+                      className="w-full px-4 py-3 rounded-xl text-sm resize-none outline-none"
+                      style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                    />
+                  )}
+
+                  {previewMode === 'split' && (
+                    <div className="flex gap-2" style={{ minHeight: 180 }}>
+                      <textarea
+                        value={personality}
+                        onChange={(e) => setPersonality(e.target.value)}
+                        placeholder="Describe your agent's personality..."
+                        rows={8}
+                        className="flex-1 px-4 py-3 rounded-xl text-sm resize-none outline-none"
+                        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text)', minHeight: 180 }}
+                      />
+                      <div
+                        className="flex-1 px-4 py-3 rounded-xl text-sm overflow-y-auto prose-chat"
+                        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', minHeight: 180 }}
+                        dangerouslySetInnerHTML={{ __html: renderedMarkdown }}
+                      />
+                    </div>
+                  )}
+
+                  {previewMode === 'preview' && (
+                    <div
+                      className="w-full px-4 py-3 rounded-xl text-sm overflow-y-auto prose-chat"
+                      style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', minHeight: 180 }}
+                      dangerouslySetInnerHTML={{ __html: renderedMarkdown }}
+                    />
+                  )}
+
                   <div className="flex items-center justify-between mt-1">
                     <p className="text-xs" style={{ color: 'var(--text-dim)' }}>
-                      This becomes the agent's system prompt.
+                      This becomes the agent's system prompt. Supports Markdown.
                     </p>
                     <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{personality.length} chars</span>
                   </div>
@@ -234,6 +314,19 @@ export function Identity() {
                 </div>
               </motion.div>
             )}
+
+            {/* Capabilities Tab */}
+            {tab === 'capabilities' && (
+              <motion.div
+                key="capabilities"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-4"
+              >
+                <CapabilitiesMatrix />
+              </motion.div>
+            )}
           </AnimatePresence>
 
           {/* Save button — always visible */}
@@ -273,6 +366,25 @@ function TabButton({ active, onClick, icon: Icon, label }: { active: boolean; on
       }}
     >
       <Icon className="w-4 h-4" />
+      {label}
+    </button>
+  )
+}
+
+function PreviewModeButton({ active, onClick, icon: Icon, label }: { active: boolean; onClick: () => void; icon: any; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-all"
+      style={{
+        background: active ? 'rgba(139, 92, 246, 0.12)' : 'transparent',
+        color: active ? 'var(--accent)' : 'var(--text-muted)',
+        border: 'none',
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+      }}
+    >
+      <Icon className="w-3 h-3" />
       {label}
     </button>
   )

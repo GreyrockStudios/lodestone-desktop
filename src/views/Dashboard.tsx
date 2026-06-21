@@ -9,6 +9,7 @@ import {
 import { useStore } from '../store'
 import { OnboardingChecklist } from '../components/OnboardingChecklist'
 import { UpdateChecker } from '../components/UpdateChecker'
+import { AgentHealth } from '../components/AgentHealth'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -180,6 +181,9 @@ export function Dashboard() {
       <div className="max-w-5xl mx-auto p-6 space-y-6">
         {/* ─── Onboarding Checklist ────────────────────────────────── */}
         <OnboardingChecklist />
+
+        {/* ─── Agent Health Dashboard ─────────────────────────────── */}
+        <AgentHealth />
 
         {/* ─── Hero Section ────────────────────────────────────────── */}
         <HeroSection

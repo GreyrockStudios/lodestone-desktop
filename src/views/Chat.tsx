@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Send, Sparkles, Copy, Pin, Download, Activity as ActivityIcon, ChevronUp, ChevronDown, Paperclip, X, FileText, Image as ImageIcon, Mic, FileDown, PanelRightClose, PanelRight, ChevronLeft } from 'lucide-react'
+import { Send, Sparkles, Copy, Pin, Download, Activity as ActivityIcon, ChevronUp, ChevronDown, Paperclip, X, FileText, Image as ImageIcon, Mic, FileDown, PanelRightClose, PanelRight, ChevronLeft, Tag as TagIcon, GitBranch, ArrowLeft } from 'lucide-react'
 import { useStore, type ChatMessage } from '../store'
 import { io, Socket } from 'socket.io-client'
 import { marked } from 'marked'
 import { ActivityFeed, type ActivityEntry } from '../components/ActivityFeed'
 import { ToolExecutionModal } from '../components/ToolExecutionModal'
+import { MessageTemplates } from '../components/MessageTemplates'
 import { useVoiceInput } from '../hooks/useVoiceInput'
 
 marked.setOptions({ breaks: true, gfm: true })
@@ -53,6 +54,8 @@ function ContextMenu({
   onCopyMarkdown,
   onPin,
   onExport,
+  onTag,
+  onBranch,
 }: {
   state: ContextMenuState
   onClose: () => void
@@ -60,6 +63,8 @@ function ContextMenu({
   onCopyMarkdown: (msg: ChatMessage) => void
   onPin: (msg: ChatMessage) => void
   onExport: (msg: ChatMessage) => void
+  onTag: (msg: ChatMessage) => void
+  onBranch: (msg: ChatMessage) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -82,6 +87,8 @@ function ContextMenu({
     { label: 'Copy', icon: Copy, action: () => onCopy(state.msg) },
     { label: 'Copy as Markdown', icon: Copy, action: () => onCopyMarkdown(state.msg) },
     { label: 'Pin to top', icon: Pin, action: () => onPin(state.msg) },
+    { label: 'Add Tag', icon: TagIcon, action: () => onTag(state.msg) },
+    { label: 'Branch from here', icon: GitBranch, action: () => onBranch(state.msg) },
     { label: 'Export as .md file', icon: Download, action: () => onExport(state.msg) },
   ]
 
@@ -377,9 +384,8 @@ function PinnedMessagesPanel({
 // ─── Main Chat Component ──────────────────────────────────────────────
 
 export function Chat() {
-  const { messages, addMessage, engineRunning, enginePort, config } = useStore()
+  const { messages, addMessage, engineRunning, enginePort, config, sending, setSending } = useStore()
   const [input, setInput] = useState('')
-  const [sending, setSending] = useState(false)
   const [streamingText, setStreamingText] = useState<string | null>(null)
   const socketRef = useRef<Socket | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -394,6 +400,25 @@ export function Chat() {
   const [toast, setToast] = useState<string | null>(null)
   const [toolModal, setToolModal] = useState<string | null>(null)
   const messageRefs = useRef<Map<string, HTMLDivElement | null>>(new Map())
+
+  // Tags state: message id -> array of tags
+  const [messageTags, setMessageTags] = useState<Map<string, string[]>>(new Map())
+  const [tagInputMsgId, setTagInputMsgId] = useState<string | null>(null)
+  const [tagInputValue, setTagInputValue] = useState('')
+  const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null)
+  const tagInputRef = useRef<HTMLInputElement>(null)
+
+  // Branching state
+  const [branches, setBranches] = useState<Map<string, ChatMessage[]>>(new Map())
+  const [activeBranchId, setActiveBranchId] = useState<string | null>(null)
+  // When in a branch, show messages from branches.get(activeBranchId), else from store
+  const [mainMessagesSnapshot, setMainMessagesSnapshot] = useState<ChatMessage[]>([])
+
+  // Ref to always have current activeBranchId in socket handlers
+  const activeBranchIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    activeBranchIdRef.current = activeBranchId
+  }, [activeBranchId])
 
   // Voice input
   const { listening: voiceListening, supported: voiceSupported, toggle: toggleVoice } = useVoiceInput(
@@ -426,22 +451,40 @@ export function Chat() {
       })
 
       socket.on('response', (text: string) => {
-        addMessage({
+        const assistantMsg: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',
           content: text,
           timestamp: Date.now(),
-        })
+        }
+        addMessage(assistantMsg)
+        if (activeBranchIdRef.current) {
+          setBranches(prev => {
+            const next = new Map(prev)
+            const branchMsgs = next.get(activeBranchIdRef.current!) || []
+            next.set(activeBranchIdRef.current!, [...branchMsgs, assistantMsg])
+            return next
+          })
+        }
         setSending(false)
       })
 
       socket.on('agent_response', (data: { text: string; content: string }) => {
-        addMessage({
+        const assistantMsg: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',
           content: data.content || data.text,
           timestamp: Date.now(),
-        })
+        }
+        addMessage(assistantMsg)
+        if (activeBranchIdRef.current) {
+          setBranches(prev => {
+            const next = new Map(prev)
+            const branchMsgs = next.get(activeBranchIdRef.current!) || []
+            next.set(activeBranchIdRef.current!, [...branchMsgs, assistantMsg])
+            return next
+          })
+        }
         setSending(false)
       })
 
@@ -451,22 +494,40 @@ export function Chat() {
 
       socket.on('stream_end', (text: string) => {
         setStreamingText(null)
-        addMessage({
+        const assistantMsg: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',
           content: text,
           timestamp: Date.now(),
-        })
+        }
+        addMessage(assistantMsg)
+        if (activeBranchIdRef.current) {
+          setBranches(prev => {
+            const next = new Map(prev)
+            const branchMsgs = next.get(activeBranchIdRef.current!) || []
+            next.set(activeBranchIdRef.current!, [...branchMsgs, assistantMsg])
+            return next
+          })
+        }
         setSending(false)
       })
 
       socket.on('error', (err: string) => {
-        addMessage({
+        const errorMsg: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'system',
           content: `Error: ${err}`,
           timestamp: Date.now(),
-        })
+        }
+        addMessage(errorMsg)
+        if (activeBranchIdRef.current) {
+          setBranches(prev => {
+            const next = new Map(prev)
+            const branchMsgs = next.get(activeBranchIdRef.current!) || []
+            next.set(activeBranchIdRef.current!, [...branchMsgs, errorMsg])
+            return next
+          })
+        }
         setSending(false)
       })
 
@@ -558,6 +619,15 @@ export function Chat() {
       timestamp: Date.now(),
     }
     addMessage(msg)
+    // Also add to active branch if in a branch
+    if (activeBranchId) {
+      setBranches(prev => {
+        const next = new Map(prev)
+        const branchMsgs = next.get(activeBranchIdRef.current!) || []
+        next.set(activeBranchIdRef.current!, [...branchMsgs, msg])
+        return next
+      })
+    }
     socketRef.current.emit('message', { content })
     setInput('')
     setAttachments([])
@@ -603,6 +673,69 @@ export function Chat() {
     URL.revokeObjectURL(url)
   }, [])
 
+  const handleTag = useCallback((msg: ChatMessage) => {
+    setTagInputMsgId(msg.id)
+    setTagInputValue('')
+    setTimeout(() => tagInputRef.current?.focus(), 50)
+  }, [])
+
+  const handleBranch = useCallback((msg: ChatMessage) => {
+    // Snapshot current main messages up to and including the branched message
+    const branchPoint = messages.indexOf(msg)
+    if (branchPoint === -1) return
+    const branchedMessages = messages.slice(0, branchPoint + 1)
+    const branchId = `branch-${Date.now()}`
+    setBranches(prev => {
+      const next = new Map(prev)
+      next.set(branchId, [...branchedMessages])
+      return next
+    })
+    // Save main messages to restore later
+    setMainMessagesSnapshot(messages)
+    setActiveBranchId(branchId)
+    setToast(`Branched from message #${branchPoint + 1}`)
+  }, [messages])
+
+  const handleBackToMain = useCallback(() => {
+    setActiveBranchId(null)
+    setToast('Back to main conversation')
+  }, [])
+
+  // Active messages: either from branch or store
+  const activeMessages = activeBranchId ? (branches.get(activeBranchId) || []) : messages
+
+  const handleAddTag = useCallback(() => {
+    if (!tagInputMsgId || !tagInputValue.trim()) return
+    const tag = tagInputValue.trim().toLowerCase()
+    setMessageTags(prev => {
+      const next = new Map(prev)
+      const existing = next.get(tagInputMsgId) || []
+      if (!existing.includes(tag)) {
+        next.set(tagInputMsgId, [...existing, tag])
+      }
+      return next
+    })
+    setTagInputValue('')
+    setTagInputMsgId(null)
+  }, [tagInputMsgId, tagInputValue])
+
+  const handleRemoveTag = useCallback((msgId: string, tag: string) => {
+    setMessageTags(prev => {
+      const next = new Map(prev)
+      const existing = next.get(msgId) || []
+      next.set(msgId, existing.filter(t => t !== tag))
+      if (next.get(msgId)?.length === 0) next.delete(msgId)
+      return next
+    })
+  }, [])
+
+  // All unique tags across all messages
+  const allTags = useMemo(() => {
+    const set = new Set<string>()
+    messageTags.forEach(tags => tags.forEach(t => set.add(t)))
+    return Array.from(set).sort()
+  }, [messageTags])
+
   const handleExportConversation = useCallback(() => {
     const md = messages.map(m => {
       const role = m.role === 'user' ? '**You**' : m.role === 'assistant' ? `**${config?.agentName || 'Agent'}**` : '*System*'
@@ -642,14 +775,18 @@ export function Chat() {
 
   // Sorted: pinned first, then by time
   const sortedMessages = useMemo(() => {
-    const pinned = messages.filter((m) => pinnedIds.has(m.id))
-    const rest = messages.filter((m) => !pinnedIds.has(m.id))
+    let result = activeMessages
+    if (activeTagFilter) {
+      result = result.filter(m => (messageTags.get(m.id) || []).includes(activeTagFilter))
+    }
+    const pinned = result.filter((m) => pinnedIds.has(m.id))
+    const rest = result.filter((m) => !pinnedIds.has(m.id))
     return [...pinned, ...rest]
-  }, [messages, pinnedIds])
+  }, [activeMessages, pinnedIds, activeTagFilter, messageTags])
 
   const pinnedMessages = useMemo(() => {
-    return messages.filter((m) => pinnedIds.has(m.id))
-  }, [messages, pinnedIds])
+    return activeMessages.filter((m) => pinnedIds.has(m.id))
+  }, [activeMessages, pinnedIds])
 
   if (!engineRunning) {
     return (
@@ -699,6 +836,47 @@ export function Chat() {
               <p className="text-base font-medium" style={{ color: 'var(--text)' }}>Drop files to attach</p>
               <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>PDF, images, code, text files</p>
             </div>
+          </div>
+        )}
+
+        {/* Branch indicator */}
+        {activeBranchId && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '6px 16px',
+              background: 'rgba(139, 92, 246, 0.08)',
+              borderBottom: '1px solid var(--border)',
+              fontSize: 12,
+              color: 'var(--accent)',
+              flexShrink: 0,
+            }}
+          >
+            <GitBranch className="w-3.5 h-3.5" />
+            <span style={{ fontWeight: 500 }}>Branched conversation</span>
+            <button
+              onClick={handleBackToMain}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                background: 'transparent',
+                border: '1px solid rgba(139, 92, 246, 0.3)',
+                borderRadius: 6,
+                padding: '2px 8px',
+                color: 'var(--accent)',
+                fontSize: 11,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                marginLeft: 'auto',
+              }}
+              title="Back to main conversation"
+            >
+              <ArrowLeft className="w-3 h-3" />
+              Back to main conversation
+            </button>
           </div>
         )}
 
@@ -786,6 +964,58 @@ export function Chat() {
           </div>
         </div>
 
+        {/* Tag Filter Bar */}
+        {allTags.length > 0 && (
+          <div
+            className="flex items-center gap-2 px-6 py-2 border-b overflow-x-auto"
+            style={{ borderColor: 'var(--border)', background: 'var(--bg-elevated)', flexShrink: 0 }}
+          >
+            <TagIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-dim)' }} />
+            <button
+              onClick={() => setActiveTagFilter(null)}
+              className="flex-shrink-0 px-2.5 py-1 rounded-lg text-xs transition-all"
+              style={{
+                background: !activeTagFilter ? 'rgba(139, 92, 246, 0.15)' : 'transparent',
+                color: !activeTagFilter ? 'var(--accent)' : 'var(--text-muted)',
+                border: `1px solid ${!activeTagFilter ? 'rgba(139, 92, 246, 0.3)' : 'var(--border)'}`,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              All
+            </button>
+            {allTags.map(tag => {
+              const tagColors: Record<string, { bg: string; color: string }> = {
+                important: { bg: 'rgba(239, 68, 68, 0.12)', color: '#EF4444' },
+                todo: { bg: 'rgba(245, 158, 11, 0.12)', color: '#F59E0B' },
+                reference: { bg: 'rgba(6, 182, 212, 0.12)', color: '#06B6D4' },
+              }
+              const c = tagColors[tag] || { bg: 'rgba(139, 92, 246, 0.12)', color: '#A78BFA' }
+              return (
+                <button
+                  key={tag}
+                  onClick={() => setActiveTagFilter(activeTagFilter === tag ? null : tag)}
+                  className="flex-shrink-0 px-2.5 py-1 rounded-lg text-xs transition-all"
+                  style={{
+                    background: activeTagFilter === tag ? c.bg : 'transparent',
+                    color: activeTagFilter === tag ? c.color : 'var(--text-muted)',
+                    border: `1px solid ${activeTagFilter === tag ? c.color + '40' : 'var(--border)'}`,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  #{tag}
+                </button>
+              )
+            })}
+            {activeTagFilter && (
+              <span className="text-xs" style={{ color: 'var(--text-dim)' }}>
+                Filtering: {sortedMessages.length} message(s)
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4">
           {messages.length === 0 ? (
@@ -810,9 +1040,45 @@ export function Chat() {
                   <MessageBubble
                     msg={msg}
                     pinned={pinnedIds.has(msg.id)}
+                    tags={messageTags.get(msg.id) || []}
                     onContextMenu={handleContextMenu}
                     onToolClick={(toolName: string) => setToolModal(toolName)}
+                    onRemoveTag={(tag: string) => handleRemoveTag(msg.id, tag)}
                   />
+                  {tagInputMsgId === msg.id && (
+                    <div className="flex justify-start mb-2">
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+                        <TagIcon className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+                        <input
+                          ref={tagInputRef}
+                          type="text"
+                          value={tagInputValue}
+                          onChange={(e) => setTagInputValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') { e.preventDefault(); handleAddTag() }
+                            if (e.key === 'Escape') { setTagInputMsgId(null); setTagInputValue('') }
+                          }}
+                          placeholder="Enter tag name..."
+                          className="text-xs px-2 py-1 rounded"
+                          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)', width: 140, fontFamily: 'inherit' }}
+                        />
+                        <button
+                          onClick={handleAddTag}
+                          className="text-xs px-2 py-1 rounded"
+                          style={{ background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                        >
+                          Add
+                        </button>
+                        <button
+                          onClick={() => { setTagInputMsgId(null); setTagInputValue('') }}
+                          className="text-xs px-1 py-1 rounded"
+                          style={{ background: 'transparent', color: 'var(--text-dim)', border: 'none', cursor: 'pointer' }}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               {streamingText && (
@@ -930,6 +1196,10 @@ export function Chat() {
                   `}</style>
                 )}
               </button>
+              <MessageTemplates onInsert={(text) => {
+                setInput(text)
+                if (textareaRef.current) textareaRef.current.focus()
+              }} currentInput={input} />
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -977,6 +1247,8 @@ export function Chat() {
             onCopyMarkdown={handleCopyMarkdown}
             onPin={handlePin}
             onExport={handleExport}
+            onTag={handleTag}
+            onBranch={handleBranch}
           />
         )}
 
@@ -1025,15 +1297,19 @@ function TypingDots({ name }: { name: string }) {
 function MessageBubble({
   msg,
   pinned,
+  tags,
   onContextMenu,
   onToolClick,
+  onRemoveTag,
   dimmed = false,
   highlightQuery = '',
 }: {
   msg: ChatMessage
   pinned: boolean
+  tags: string[]
   onContextMenu: (e: React.MouseEvent, msg: ChatMessage) => void
   onToolClick: (toolName: string) => void
+  onRemoveTag: (tag: string) => void
   dimmed?: boolean
   highlightQuery?: string
 }) {
@@ -1112,6 +1388,34 @@ function MessageBubble({
             </div>
           )}
         </div>
+        {/* Tag badges */}
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1.5" style={{ justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+            {tags.map(tag => {
+              const tagColors: Record<string, { bg: string; color: string }> = {
+                important: { bg: 'rgba(239, 68, 68, 0.12)', color: '#EF4444' },
+                todo: { bg: 'rgba(245, 158, 11, 0.12)', color: '#F59E0B' },
+                reference: { bg: 'rgba(6, 182, 212, 0.12)', color: '#06B6D4' },
+              }
+              const c = tagColors[tag] || { bg: 'rgba(139, 92, 246, 0.12)', color: '#A78BFA' }
+              return (
+                <span
+                  key={tag}
+                  className="text-xs px-2 py-0.5 rounded-full flex items-center gap-1"
+                  style={{ background: c.bg, color: c.color, border: `1px solid ${c.color}30` }}
+                >
+                  #{tag}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onRemoveTag(tag) }}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, opacity: 0.5 }}
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </span>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )

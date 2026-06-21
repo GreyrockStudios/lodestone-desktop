@@ -24,6 +24,10 @@ interface AppState {
   messages: ChatMessage[]
   addMessage: (m: ChatMessage) => void
   clearMessages: () => void
+
+  // Sending state
+  sending: boolean
+  setSending: (v: boolean) => void
   
   // Memory stats
   memoryCount: number
@@ -33,7 +37,7 @@ interface AppState {
   // Socket connection status
   socketStatus: SocketStatus
   setSocketStatus: (s: SocketStatus) => void
-  
+
   // Token counts
   inputTokens: number
   totalTokens: number
@@ -84,6 +88,9 @@ export const useStore = create<AppState>((set) => ({
   messages: [],
   addMessage: (m) => set((s) => ({ messages: [...s.messages, m] })),
   clearMessages: () => set({ messages: [] }),
+
+  sending: false,
+  setSending: (v) => set({ sending: v }),
   
   memoryCount: 0,
   wikiCount: 0,
@@ -91,7 +98,7 @@ export const useStore = create<AppState>((set) => ({
   
   socketStatus: 'disconnected',
   setSocketStatus: (s) => set({ socketStatus: s }),
-  
+
   inputTokens: 0,
   totalTokens: 0,
   setInputTokens: (n) => set({ inputTokens: n }),

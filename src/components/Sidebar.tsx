@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { LayoutDashboard, MessageSquare, Brain, Wrench, Clock, User, Settings, FolderOpen, Power, Network, History, Shield, ChevronDown, Plus, Settings2, Check } from 'lucide-react'
 import { useStore } from '../store'
 
@@ -55,6 +55,7 @@ function AgentSwitcher({
   onSelectAgent,
   onCreateAgent,
   onManageAgents,
+  mood,
 }: {
   agentName: string
   agentEmoji: string
@@ -63,6 +64,7 @@ function AgentSwitcher({
   onSelectAgent: (agent: SavedAgent) => void
   onCreateAgent: (name: string) => void
   onManageAgents: () => void
+  mood: { emoji: string; label: string; color: string }
 }) {
   const [open, setOpen] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -119,10 +121,18 @@ function AgentSwitcher({
           <span className="text-sm font-bold text-white">{agentEmoji || agentName?.[0]?.toUpperCase() || 'A'}</span>
         </div>
         <div className="flex-1 min-w-0 text-left">
-          <div className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{agentName || 'Agent'}</div>
+          <div className="flex items-center gap-1.5">
+            <div className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{agentName || 'Agent'}</div>
+            <span
+              title={mood.label}
+              style={{ fontSize: 12, lineHeight: 1, cursor: 'help' }}
+            >
+              {mood.emoji}
+            </span>
+          </div>
           <div className="flex items-center gap-1">
-            <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981' }} />
-            <span className="text-xs" style={{ color: 'var(--text-dim)' }}>Running</span>
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: mood.color }} />
+            <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{mood.label}</span>
           </div>
         </div>
         <ChevronDown
@@ -299,7 +309,7 @@ function AgentSwitcher({
 // ─── Sidebar ──────────────────────────────────────────────────────────
 
 export function Sidebar() {
-  const { activeView, setActiveView, engineRunning, config, memoryCount, wikiCount } = useStore()
+  const { activeView, setActiveView, engineRunning, config, memoryCount, wikiCount, socketStatus, sending } = useStore()
   const [agents, setAgents] = useState<SavedAgent[]>([])
   const [currentAgentId, setCurrentAgentId] = useState('default')
 
@@ -357,6 +367,14 @@ export function Sidebar() {
   const agentEmoji = config?.agentEmoji || agents.find((a) => a.id === currentAgentId)?.emoji || '🤖'
   const agentName = config?.agentName || agents.find((a) => a.id === currentAgentId)?.name || 'Agent'
 
+  // Compute agent mood/state
+  const agentMood = useMemo(() => {
+    if (!engineRunning) return { emoji: '⚪', label: 'Idle', color: '#6B7280' }
+    if (socketStatus === 'error') return { emoji: '🔴', label: 'Error', color: '#EF4444' }
+    if (sending) return { emoji: '🟡', label: 'Thinking', color: '#F59E0B' }
+    return { emoji: '🟢', label: 'Active', color: '#10B981' }
+  }, [engineRunning, socketStatus, sending])
+
   return (
     <div className="w-60 flex flex-col h-full" style={{ background: 'var(--bg-card)', borderRight: '1px solid var(--border)' }}>
       {/* Agent header with switcher */}
@@ -369,6 +387,7 @@ export function Sidebar() {
           onSelectAgent={handleSelectAgent}
           onCreateAgent={handleCreateAgent}
           onManageAgents={handleManageAgents}
+          mood={agentMood}
         />
       </div>
 
