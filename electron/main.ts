@@ -72,9 +72,27 @@ function hasCompletedWizard(): boolean {
 }
 
 // ---- Lodestone engine management ----
+function getLodestoneBin(): { cmd: string; args: string[] } {
+  const isDev = !app.isPackaged
+  if (isDev) {
+    // In dev, use npx to run the local lodestone package
+    return { cmd: 'npx', args: ['lodestone'] }
+  }
+  // In production, lodestone is installed as a dependency
+  // The bin is at node_modules/.bin/lodestone
+  const lodestoneBin = path.join(
+    process.resourcesPath,
+    'app.asar.unpacked',
+    'node_modules',
+    '.bin',
+    'lodestone'
+  )
+  return { cmd: lodestoneBin, args: [] }
+}
+
 function startLodestone(config: AgentConfig): Promise<{ port: number }> {
   return new Promise((resolve, reject) => {
-    // Generate a random port for the engine
+    // Generate a random port for the engine (3000-3999)
     const port = 3000 + Math.floor(Math.random() * 1000)
     lodestonePort = port
 
@@ -115,20 +133,11 @@ safety:
     const configYamlPath = path.join(getAppDataPath(), 'lodestone.config.yaml')
     fs.writeFileSync(configYamlPath, lodestoneConfig, 'utf-8')
 
-    // Try to find the lodestone binary
-    // In dev: use npx lodestone
-    // In production: bundled binary
-    const isDev = !app.isPackaged
-    const lodestoneBin = isDev
-      ? 'npx'
-      : path.join(process.resourcesPath, 'lodestone', 'lodestone')
-
-    const args = isDev
-      ? ['lodestone', 'start', '--config', configYamlPath]
-      : ['start', '--config', configYamlPath]
+    const { cmd, args: binArgs } = getLodestoneBin()
+    const args = [...binArgs, 'start', '--config', configYamlPath]
 
     try {
-      lodestoneProcess = spawn(lodestoneBin, args, {
+      lodestoneProcess = spawn(cmd, args, {
         cwd: getWorkspacePath(),
         stdio: ['ignore', 'pipe', 'pipe'],
         env: {

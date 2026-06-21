@@ -11,6 +11,12 @@ files:
   - dist/**/*
   - dist-electron/**/*
   - package.json
+  - node_modules/**/*
+
+asarUnpack:
+  - node_modules/lodestone/**/*
+  - node_modules/better-sqlite3/**/*
+  - node_modules/lancedb/**/*
 
 mac:
   category: public.app-category.productivity
