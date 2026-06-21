@@ -15,6 +15,15 @@ files:
 asarUnpack:
   - node_modules/better-sqlite3/**/*
 
+extraResources:
+  - from: engine
+    to: engine
+    filter:
+      - '**/*'
+      - '!**/node_modules/.cache'
+      - '!**/*.ts'
+      - '!**/tsconfig.tsbuildinfo'
+
 mac:
   category: public.app-category.productivity
   target:

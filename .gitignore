@@ -3,4 +3,4 @@ dist/
 dist-electron/
 release/
 *.log
-.DS_Store
+.DS_Storeengine/

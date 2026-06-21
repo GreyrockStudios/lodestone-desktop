@@ -77,19 +77,20 @@ function hasCompletedWizard(): boolean {
 function getLodestoneBin(): { cmd: string; args: string[] } {
   const isDev = !app.isPackaged
   if (isDev) {
-    // In dev, use npx to run the local lodestone package
+    // In dev, run the engine directly from the local lodestone project
+    const engineRoot = path.resolve(__dirname, '../../engine')
+    const cliEntry = path.join(engineRoot, 'packages', 'cli', 'dist', 'index.js')
+    if (fs.existsSync(cliEntry)) {
+      return { cmd: process.execPath, args: [cliEntry] }
+    }
+    // Fallback: try npx
     return { cmd: 'npx', args: ['lodestone'] }
   }
-  // In production, lodestone is installed as a dependency
-  // The bin is at node_modules/.bin/lodestone
-  const lodestoneBin = path.join(
-    process.resourcesPath,
-    'app.asar.unpacked',
-    'node_modules',
-    '.bin',
-    'lodestone'
-  )
-  return { cmd: lodestoneBin, args: [] }
+  // In production, the engine is bundled in resources/engine/
+  const engineDir = path.join(process.resourcesPath, 'engine')
+  const cliEntry = path.join(engineDir, 'packages', 'cli', 'dist', 'index.js')
+  // Use Electron's bundled Node to run the CLI entry point
+  return { cmd: process.execPath, args: [cliEntry] }
 }
 
 function startLodestone(config: AgentConfig): Promise<{ port: number }> {
@@ -139,12 +140,20 @@ safety:
     const args = [...binArgs, 'start', '--config', configYamlPath]
 
     try {
+      // Build NODE_PATH so the engine can resolve its workspace dependencies
+      const engineDir = !app.isPackaged
+        ? path.resolve(__dirname, '../../engine')
+        : path.join(process.resourcesPath, 'engine')
+      const engineNodeModules = path.join(engineDir, 'node_modules')
+      const coreNodeModules = path.join(engineDir, 'packages', 'core', 'node_modules')
+
       lodestoneProcess = spawn(cmd, args, {
         cwd: getWorkspacePath(),
         stdio: ['ignore', 'pipe', 'pipe'],
         env: {
           ...process.env,
-          NODE_ENV: 'production'
+          NODE_ENV: 'production',
+          NODE_PATH: [engineNodeModules, coreNodeModules, process.env.NODE_PATH].filter(Boolean).join(path.delimiter)
         }
       })
       engineStartTime = Date.now()
