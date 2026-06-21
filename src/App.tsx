@@ -13,6 +13,7 @@ import { Dashboard } from './views/Dashboard'
 import { History } from './views/History'
 import { Safety } from './views/Safety'
 import { CanvasView } from './views/CanvasView'
+import { HostControl } from './views/HostControl'
 import { PluginManager } from './components/PluginManager'
 import { WorkflowBuilder } from './components/WorkflowBuilder'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
@@ -102,6 +103,7 @@ export default function App() {
           {activeView === 'schedule' && <Schedule />}
           {activeView === 'safety' && <Safety />}
           {activeView === 'canvas' && <CanvasView />}
+          {activeView === 'host' && <HostControl />}
           {activeView === 'plugins' && (
             <div className="flex-1 overflow-y-auto p-6" style={{ background: 'var(--bg)' }}>
               <div className="max-w-2xl mx-auto">

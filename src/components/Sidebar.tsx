@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { LayoutDashboard, MessageSquare, Brain, Wrench, Clock, User, Settings, FolderOpen, Power, Network, History, Shield, ChevronDown, Plus, Settings2, Check } from 'lucide-react'
+import { LayoutDashboard, MessageSquare, Brain, Wrench, Clock, User, Settings, FolderOpen, Power, Network, History, Shield, ChevronDown, Plus, Settings2, Check, Terminal } from 'lucide-react'
 import { useStore } from '../store'
 
 const NAV_ITEMS = [
@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { id: 'memory', label: 'Memory', icon: Brain },
   { id: 'history', label: 'History', icon: History },
   { id: 'tools', label: 'Tools', icon: Wrench },
+  { id: 'host', label: 'Host Control', icon: Terminal },
   { id: 'schedule', label: 'Schedule', icon: Clock },
   { id: 'safety', label: 'Safety', icon: Shield },
   { id: 'identity', label: 'Identity', icon: User },

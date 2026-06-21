@@ -41,15 +41,46 @@ interface LodestoneAPI {
 
   // Tray navigation
   onNavigate: (callback: (view: string) => void) => void
+
+  // Host Control
+  execCommand: (command: string, cwd?: string, timeoutMs?: number) => Promise<{ success: boolean; stdout: string; stderr: string; exitCode: number | null }>
+  listFiles: (dirPath: string) => Promise<{ success: boolean; files: FileEntry[]; error?: string }>
+  readFile: (filePath: string) => Promise<{ success: boolean; content: string; error?: string }>
+  writeFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
+  deleteFile: (filePath: string) => Promise<{ success: boolean; error?: string }>
+  moveFile: (src: string, dest: string) => Promise<{ success: boolean; error?: string }>
+  makeDir: (dirPath: string) => Promise<{ success: boolean; error?: string }>
+  getSystemInfo: () => Promise<{ platform: string; arch: string; hostname: string; uptime: number; loadAvg: number[]; totalMem: number; freeMem: number; cpus: number; nodeVersion: string }>
+  getProcessList: () => Promise<{ success: boolean; processes: ProcessInfo[]; error?: string }>
+  killProcess: (pid: number) => Promise<{ success: boolean; error?: string }>
+  openTerminal: (command?: string) => Promise<{ success: boolean; error?: string }>
+  revealFile: (filePath: string) => Promise<{ success: boolean; error?: string }>
+  getDiskUsage: (dirPath: string) => Promise<{ success: boolean; size: number; fileCount: number; error?: string }>
+}
+
+interface FileEntry {
+  name: string
+  path: string
+  isDir: boolean
+  size: number
+  modified: string
+  extension?: string
+}
+
+interface ProcessInfo {
+  pid: number
+  name: string
+  cpu: number
+  memory: number
 }
 
 interface AgentConfig {
   agentName: string
   personality: string
-  llmProvider: string
   apiKey: string
   model: string
   endpoint?: string
+  llmProvider: string
 }
 
 interface Window {

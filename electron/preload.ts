@@ -57,6 +57,21 @@ const api = {
   onNavigate: (callback: (view: string) => void) => {
     ipcRenderer.on('app:navigate', (_, view) => callback(view))
   },
+
+  // Host Control
+  execCommand: (command: string, cwd?: string, timeoutMs?: number) => ipcRenderer.invoke('host:exec', command, cwd, timeoutMs),
+  listFiles: (dirPath: string) => ipcRenderer.invoke('host:listFiles', dirPath),
+  readFile: (filePath: string) => ipcRenderer.invoke('host:readFile', filePath),
+  writeFile: (filePath: string, content: string) => ipcRenderer.invoke('host:writeFile', filePath, content),
+  deleteFile: (filePath: string) => ipcRenderer.invoke('host:deleteFile', filePath),
+  moveFile: (src: string, dest: string) => ipcRenderer.invoke('host:moveFile', src, dest),
+  makeDir: (dirPath: string) => ipcRenderer.invoke('host:makeDir', dirPath),
+  getSystemInfo: () => ipcRenderer.invoke('host:systemInfo'),
+  getProcessList: () => ipcRenderer.invoke('host:processList'),
+  killProcess: (pid: number) => ipcRenderer.invoke('host:killProcess', pid),
+  openTerminal: (command?: string) => ipcRenderer.invoke('host:openTerminal', command),
+  revealFile: (filePath: string) => ipcRenderer.invoke('host:revealFile', filePath),
+  getDiskUsage: (dirPath: string) => ipcRenderer.invoke('host:diskUsage', dirPath),
 }
 
 contextBridge.exposeInMainWorld('lodestone', api)

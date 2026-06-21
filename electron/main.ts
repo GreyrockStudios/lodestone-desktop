@@ -814,6 +814,247 @@ function setupIPC() {
       return exportFile
     } catch (err) { return null }
   })
+
+  // ─── Host Control ──────────────────────────────────────────────────
+
+  // Execute shell command
+  ipcMain.handle('host:exec', async (_, command: string, cwd?: string, timeoutMs?: number) => {
+    return new Promise((resolve) => {
+      const timeout = timeoutMs || 30000
+      const proc = spawn(command, {
+        cwd: cwd || process.cwd(),
+        shell: true,
+        timeout,
+        env: { ...process.env },
+      })
+      let stdout = ''
+      let stderr = ''
+      proc.stdout.on('data', (data) => { stdout += data.toString() })
+      proc.stderr.on('data', (data) => { stderr += data.toString() })
+      proc.on('close', (code) => {
+        resolve({ success: code === 0, stdout: stdout.slice(0, 100000), stderr: stderr.slice(0, 100000), exitCode: code })
+      })
+      proc.on('error', (err) => {
+        resolve({ success: false, stdout: '', stderr: err.message, exitCode: null })
+      })
+    })
+  })
+
+  // List files in directory
+  ipcMain.handle('host:listFiles', async (_, dirPath: string) => {
+    try {
+      if (!fs.existsSync(dirPath)) {
+        return { success: false, files: [], error: 'Directory does not exist' }
+      }
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+      const files: any[] = entries.map(entry => {
+        const fullPath = path.join(dirPath, entry.name)
+        const stat = fs.statSync(fullPath)
+        const ext = entry.isFile() ? entry.name.split('.').pop() || '' : undefined
+        return {
+          name: entry.name,
+          path: fullPath,
+          isDir: entry.isDirectory(),
+          size: stat.size,
+          modified: stat.mtime.toISOString(),
+          extension: ext,
+        }
+      })
+      // Dirs first, then files alphabetically
+      files.sort((a, b) => {
+        if (a.isDir !== b.isDir) return a.isDir ? -1 : 1
+        return a.name.localeCompare(b.name)
+      })
+      return { success: true, files }
+    } catch (err: any) {
+      return { success: false, files: [], error: err.message }
+    }
+  })
+
+  // Read file
+  ipcMain.handle('host:readFile', async (_, filePath: string) => {
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8')
+      return { success: true, content: content.slice(0, 500000) }
+    } catch (err: any) {
+      return { success: false, content: '', error: err.message }
+    }
+  })
+
+  // Write file
+  ipcMain.handle('host:writeFile', async (_, filePath: string, content: string) => {
+    try {
+      const dir = path.dirname(filePath)
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+      fs.writeFileSync(filePath, content, 'utf-8')
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // Delete file
+  ipcMain.handle('host:deleteFile', async (_, filePath: string) => {
+    try {
+      fs.unlinkSync(filePath)
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // Move/rename file
+  ipcMain.handle('host:moveFile', async (_, src: string, dest: string) => {
+    try {
+      fs.renameSync(src, dest)
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // Make directory
+  ipcMain.handle('host:makeDir', async (_, dirPath: string) => {
+    try {
+      fs.mkdirSync(dirPath, { recursive: true })
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // System info
+  ipcMain.handle('host:systemInfo', () => {
+    const os = require('os')
+    return {
+      platform: process.platform,
+      arch: process.arch,
+      hostname: os.hostname(),
+      uptime: os.uptime(),
+      loadAvg: os.loadavg(),
+      totalMem: os.totalmem(),
+      freeMem: os.freemem(),
+      cpus: os.cpus().length,
+      nodeVersion: process.version,
+    }
+  })
+
+  // Process list (using ps on macOS/Linux, tasklist on Windows)
+  ipcMain.handle('host:processList', async () => {
+    return new Promise((resolve) => {
+      const cmd = process.platform === 'win32' ? 'tasklist /FO CSV /NH' : 'ps aux --sort=-%cpu | head -50'
+      const proc = spawn(cmd, { shell: true })
+      let output = ''
+      proc.stdout.on('data', (d) => { output += d.toString() })
+      proc.on('close', () => {
+        try {
+          const processes: any[] = []
+          if (process.platform === 'win32') {
+            // Parse CSV from tasklist
+            for (const line of output.trim().split('\n')) {
+              const parts = line.replace(/"/g, '').split(',')
+              if (parts.length >= 5) {
+                processes.push({ pid: parseInt(parts[1]) || 0, name: parts[0], cpu: 0, memory: parseInt(parts[4].replace(/[^\d]/g, '')) || 0 })
+              }
+            }
+          } else {
+            // Parse ps output
+            const lines = output.trim().split('\n').slice(1)
+            for (const line of lines) {
+              const parts = line.trim().split(/\s+/)
+              if (parts.length >= 4) {
+                processes.push({ pid: parseInt(parts[1]) || 0, name: parts[10] || parts.slice(10).join(' ') || 'unknown', cpu: parseFloat(parts[2]) || 0, memory: parseFloat(parts[3]) || 0 })
+              }
+            }
+          }
+          resolve({ success: true, processes })
+        } catch (err: any) {
+          resolve({ success: false, processes: [], error: err.message })
+        }
+      })
+      proc.on('error', () => resolve({ success: false, processes: [], error: 'Failed to list processes' }))
+    })
+  })
+
+  // Kill process
+  ipcMain.handle('host:killProcess', (_, pid: number) => {
+    try {
+      process.kill(pid)
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // Open terminal
+  ipcMain.handle('host:openTerminal', (_, command?: string) => {
+    try {
+      if (process.platform === 'darwin') {
+        // macOS: use Terminal.app via AppleScript
+        if (command) {
+          spawn('osascript', ['-e', `tell application "Terminal" to do script "${command.replace(/"/g, '\\"')}"`])
+        } else {
+          spawn('open', ['-a', 'Terminal'])
+        }
+      } else if (process.platform === 'win32') {
+        spawn('cmd', ['/c', 'start', 'cmd'])
+      } else {
+        // Linux: try x-terminal-emulator, gnome-terminal, xterm
+        if (command) {
+          spawn('sh', ['-c', `x-terminal-emulator -e '${command}' 2>/dev/null || gnome-terminal -- '${command}' 2>/dev/null || xterm -e '${command}'`])
+        } else {
+          spawn('sh', ['-c', 'x-terminal-emulator 2>/dev/null || gnome-terminal 2>/dev/null || xterm'])
+        }
+      }
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // Reveal file in Finder/Explorer
+  ipcMain.handle('host:revealFile', (_, filePath: string) => {
+    try {
+      shell.showItemInFolder(filePath)
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // Disk usage (du command on macOS/Linux)
+  ipcMain.handle('host:diskUsage', (_, dirPath: string) => {
+    return new Promise((resolve) => {
+      if (!fs.existsSync(dirPath)) {
+        resolve({ success: false, size: 0, fileCount: 0, error: 'Directory does not exist' })
+        return
+      }
+      // Walk the directory to count files and sum sizes
+      let totalSize = 0
+      let fileCount = 0
+      try {
+        const walk = (dir: string) => {
+          const entries = fs.readdirSync(dir, { withFileTypes: true })
+          for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name)
+            if (entry.isDirectory()) {
+              walk(fullPath)
+            } else {
+              try {
+                const stat = fs.statSync(fullPath)
+                totalSize += stat.size
+                fileCount++
+              } catch {}
+            }
+          }
+        }
+        walk(dirPath)
+        resolve({ success: true, size: totalSize, fileCount })
+      } catch (err: any) {
+        resolve({ success: false, size: 0, fileCount: 0, error: err.message })
+      }
+    })
+  })
 }
 
 // ---- App lifecycle ----
