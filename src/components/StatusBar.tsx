@@ -139,7 +139,7 @@ function Badge({
 
 // ─── StatusBar ───────────────────────────────────────────────────────
 
-export function StatusBar() {
+export function StatusBar({ onToggleLogViewer, onToggleFileWatcher }: { onToggleLogViewer?: () => void; onToggleFileWatcher?: () => void }) {
   const { engineRunning, enginePort, config, setActiveView, socketStatus, inputTokens, totalTokens } = useStore()
   const [uptime, setUptime] = useState(0)
   const [stats, setStats] = useState<DashboardStats | null>(null)

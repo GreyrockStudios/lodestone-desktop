@@ -56,6 +56,11 @@ interface LodestoneAPI {
   openTerminal: (command?: string) => Promise<{ success: boolean; error?: string }>
   revealFile: (filePath: string) => Promise<{ success: boolean; error?: string }>
   getDiskUsage: (dirPath: string) => Promise<{ success: boolean; size: number; fileCount: number; error?: string }>
+
+  // File Watcher
+  watchPath: (dirPath: string) => Promise<{ success: boolean; error?: string }>
+  unwatchPath: (dirPath: string) => Promise<{ success: boolean; error?: string }>
+  onFileEvent: (callback: (data: { path: string; event: string }) => void) => (() => void)
 }
 
 interface FileEntry {

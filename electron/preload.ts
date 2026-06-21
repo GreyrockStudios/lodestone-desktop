@@ -72,6 +72,15 @@ const api = {
   openTerminal: (command?: string) => ipcRenderer.invoke('host:openTerminal', command),
   revealFile: (filePath: string) => ipcRenderer.invoke('host:revealFile', filePath),
   getDiskUsage: (dirPath: string) => ipcRenderer.invoke('host:diskUsage', dirPath),
+
+  // File Watcher
+  watchPath: (dirPath: string) => ipcRenderer.invoke('host:watchPath', dirPath),
+  unwatchPath: (dirPath: string) => ipcRenderer.invoke('host:unwatchPath', dirPath),
+  onFileEvent: (callback: (data: { path: string; event: string }) => void) => {
+    const handler = (_: any, data: { path: string; event: string }) => callback(data)
+    ipcRenderer.on('host:fileEvent', handler)
+    return () => { ipcRenderer.removeListener('host:fileEvent', handler) }
+  },
 }
 
 contextBridge.exposeInMainWorld('lodestone', api)

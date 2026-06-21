@@ -1055,6 +1055,51 @@ function setupIPC() {
       }
     })
   })
+
+  // ─── File Watcher ──────────────────────────────────────────────
+
+  // Map of watched paths to their fs.FSWatcher instances
+  const watchers = new Map<string, fs.FSWatcher>()
+
+  // Watch a directory for changes
+  ipcMain.handle('host:watchPath', (_, dirPath: string) => {
+    if (!fs.existsSync(dirPath)) {
+      return { success: false, error: 'Directory does not exist' }
+    }
+    // Already watching?
+    if (watchers.has(dirPath)) {
+      return { success: true }
+    }
+    try {
+      const watcher = fs.watch(dirPath, { recursive: true }, (eventType, filename) => {
+        if (!filename) return
+        const fullPath = path.join(dirPath, filename)
+        // Map fs.watch event types to our event types
+        let event: 'created' | 'modified' | 'deleted' | 'renamed' = 'modified'
+        if (eventType === 'rename') {
+          event = fs.existsSync(fullPath) ? 'created' : 'deleted'
+        }
+        mainWindow?.webContents.send('host:fileEvent', { path: fullPath, event })
+      })
+      watcher.on('error', () => {
+        watchers.delete(dirPath)
+      })
+      watchers.set(dirPath, watcher)
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  // Stop watching a directory
+  ipcMain.handle('host:unwatchPath', (_, dirPath: string) => {
+    const watcher = watchers.get(dirPath)
+    if (watcher) {
+      watcher.close()
+      watchers.delete(dirPath)
+    }
+    return { success: true }
+  })
 }
 
 // ---- App lifecycle ----

@@ -25,10 +25,12 @@ import {
   Square,
   Loader2,
   Bell,
+  Globe,
 } from 'lucide-react'
 import { useStore, type AgentConfig } from '../store'
 import { ModelComparison } from '../components/ModelComparison'
 import { CapabilitiesMatrix } from '../components/CapabilitiesMatrix'
+import { EnvManager } from '../components/EnvManager'
 
 export function SettingsView() {
   const {
@@ -716,6 +718,13 @@ export function SettingsView() {
                   )}
                 </div>
               )}
+            </div>
+          </Section>
+
+          {/* Environment Variables */}
+          <Section icon={Globe} title="Environment Variables">
+            <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+              <EnvManager />
             </div>
           </Section>
 

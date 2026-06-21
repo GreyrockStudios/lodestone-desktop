@@ -14,6 +14,7 @@ import { History } from './views/History'
 import { Safety } from './views/Safety'
 import { CanvasView } from './views/CanvasView'
 import { HostControl } from './views/HostControl'
+import { GitView } from './views/GitView'
 import { PluginManager } from './components/PluginManager'
 import { WorkflowBuilder } from './components/WorkflowBuilder'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
@@ -23,16 +24,21 @@ import { SearchAll } from './components/SearchAll'
 import { useStore, type AgentConfig } from './store'
 import { ThemeToggle } from './components/ThemeToggle'
 import { Plug, GitBranch } from 'lucide-react'
+import { LogViewer } from './components/LogViewer'
+import { FileWatcher } from './components/FileWatcher'
 import { DeveloperConsole } from './components/DeveloperConsole'
 import { UpdateChecker } from './components/UpdateChecker'
 import { CrashReporter } from './components/CrashReporter'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { QuickStats } from './components/QuickStats'
+import { QuickActions } from './components/QuickActions'
 
 export default function App() {
-  const { hasConfig, setHasConfig, activeView, setConfig, setEngineState, theme } = useStore()
+  const { hasConfig, setHasConfig, activeView, setConfig, setEngineState, theme, setActiveView } = useStore()
   const [showTour, setShowTour] = useState(false)
   const { searchAllOpen, setSearchAllOpen } = useKeyboardShortcuts()
+  const [showLogViewer, setShowLogViewer] = useState(false)
+  const [showFileWatcher, setShowFileWatcher] = useState(false)
 
   // Apply theme to root element
   useEffect(() => {
@@ -100,6 +106,7 @@ export default function App() {
           {activeView === 'memory' && <Memory />}
           {activeView === 'history' && <History />}
           {activeView === 'tools' && <Tools />}
+          {activeView === 'git' && <GitView />}
           {activeView === 'schedule' && <Schedule />}
           {activeView === 'safety' && <Safety />}
           {activeView === 'canvas' && <CanvasView />}
@@ -129,14 +136,17 @@ export default function App() {
           {activeView === 'identity' && <Identity />}
           {activeView === 'settings' && <SettingsView />}
         </main>
-        <StatusBar />
+        <StatusBar onToggleLogViewer={() => setShowLogViewer(true)} onToggleFileWatcher={() => setShowFileWatcher(true)} />
       </div>
       <QuickStats />
+      <QuickActions onNavigate={(v) => setActiveView(v)} />
       {showTour && (
         <WelcomeTour onComplete={() => setShowTour(false)} />
       )}
       <CommandPalette />
       <SearchAll open={searchAllOpen} onClose={() => setSearchAllOpen(false)} onNavigate={(view) => useStore.getState().setActiveView(view)} />
+      <LogViewer open={showLogViewer} onClose={() => setShowLogViewer(false)} />
+      <FileWatcher open={showFileWatcher} onClose={() => setShowFileWatcher(false)} />
       <DeveloperConsole />
       <CrashReporter />
       <ShortcutsHelp />

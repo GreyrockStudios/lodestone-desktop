@@ -2,12 +2,17 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Terminal, Folder, FileText, FilePlus, Trash2, RefreshCw, ChevronRight, ChevronDown,
   Cpu, HardDrive, MemoryStick, Clock, Activity, X, Play, Square, ArrowRight,
-  Search, Eye, Edit3, Copy, Check, AlertTriangle, Home, FolderPlus, Power
+  Search, Eye, Edit3, Copy, Check, AlertTriangle, Home, FolderPlus, Power,
+  Container, Server, Network
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore } from '../store'
+import { SSHManager } from '../components/SSHManager'
+import { DockerManager } from '../components/DockerManager'
+import { ServiceManager } from '../components/ServiceManager'
+import { NetworkScanner } from '../components/NetworkScanner'
 
-type Tab = 'terminal' | 'files' | 'system' | 'processes'
+type Tab = 'terminal' | 'files' | 'system' | 'processes' | 'ssh' | 'docker' | 'services' | 'network'
 
 interface FileItem {
   name: string
@@ -54,7 +59,7 @@ export function HostControl() {
           </span>
         </div>
         <div className="flex items-center gap-1">
-          {(['terminal', 'files', 'system', 'processes'] as Tab[]).map(t => (
+          {(['terminal', 'files', 'system', 'processes', 'ssh', 'docker', 'services', 'network'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -78,6 +83,10 @@ export function HostControl() {
         {tab === 'files' && <FileBrowser />}
         {tab === 'system' && <SystemInfo />}
         {tab === 'processes' && <ProcessManager />}
+        {tab === 'ssh' && <SSHManager />}
+        {tab === 'docker' && <DockerManager />}
+        {tab === 'services' && <ServiceManager />}
+        {tab === 'network' && <NetworkScanner />}
       </div>
     </div>
   )

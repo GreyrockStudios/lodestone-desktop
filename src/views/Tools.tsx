@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Wrench, Search, ChevronDown, ChevronRight, Shield, ShieldAlert, Star, Clock } from 'lucide-react'
+import { Wrench, Search, ChevronDown, ChevronRight, Shield, ShieldAlert, Star, Clock, Package } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { PackageManager } from '../components/PackageManager'
 
 interface ToolInfo {
   name: string
