@@ -22,6 +22,7 @@ import { SearchAll } from './components/SearchAll'
 import { useStore, type AgentConfig } from './store'
 import { ThemeToggle } from './components/ThemeToggle'
 import { Plug, GitBranch } from 'lucide-react'
+import { DeveloperConsole } from './components/DeveloperConsole'
 import { UpdateChecker } from './components/UpdateChecker'
 import { CrashReporter } from './components/CrashReporter'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
@@ -132,6 +133,7 @@ export default function App() {
       )}
       <CommandPalette />
       <SearchAll open={searchAllOpen} onClose={() => setSearchAllOpen(false)} onNavigate={(view) => useStore.getState().setActiveView(view)} />
+      <DeveloperConsole />
       <CrashReporter />
       <ShortcutsHelp />
     </div>
