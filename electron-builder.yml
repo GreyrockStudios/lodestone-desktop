@@ -1,7 +1,6 @@
 appId: studio.greyrock.lodestone
 productName: Lodestone
 copyright: Copyright © 2026 Greyrock Studio
-license: MIT
 
 directories:
   output: release
@@ -14,9 +13,7 @@ files:
   - node_modules/**/*
 
 asarUnpack:
-  - node_modules/lodestone/**/*
   - node_modules/better-sqlite3/**/*
-  - node_modules/lancedb/**/*
 
 mac:
   category: public.app-category.productivity
