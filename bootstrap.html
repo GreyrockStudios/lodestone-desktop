@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lodestone</title>
+  <!--
+    Desktop detection bootstrap page.
+    
+    The SPA at heylodestone.com checks window.__TAURI__ / window.__TAURI_INTERNALS__
+    at module initialization time to decide desktop vs web routing.
+    
+    We set these globals here via an inline script tag (runs before any
+    module scripts), then navigate to the remote SPA. Because this is a
+    same-origin navigation from a file:// page to https://, the window
+    context gets replaced — but the preload.js script re-sets the globals
+    before any page JS runs in the new context.
+    
+    This page is the PRIMARY mechanism: it ensures the globals exist at
+    page load time. The preload is the SECONDARY mechanism for subsequent
+    navigations.
+  -->
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+      color: #a1a1aa;
+    }
+    .loader {
+      text-align: center;
+    }
+    .loader svg {
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; transform: scale(0.95); }
+      50% { opacity: 1; transform: scale(1); }
+    }
+    p { margin-top: 16px; font-size: 14px; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <div class="loader">
+    <svg width="48" height="48" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="256" cy="256" r="40" fill="#8B5CF6" opacity="0.8"/>
+      <circle cx="256" cy="256" r="20" fill="white" opacity="0.9"/>
+    </svg>
+    <p>Loading Lodestone…</p>
+  </div>
+
+  <!-- Set desktop detection globals BEFORE any other script runs -->
+  <script>
+    window.__TAURI_INTERNALS__ = {
+      invoke: function(cmd, args) {
+        if (window.electronAPI) {
+          switch(cmd) {
+            case 'set_badge_count': return window.electronAPI.setBadgeCount(args && args.count);
+            case 'save_file': return window.electronAPI.saveFile(args && args.content, args && args.filename, args && args.filters);
+            case 'read_file_contents': return window.electronAPI.readFile(args && args.path);
+            case 'get_app_version': return window.electronAPI.getVersion();
+            case 'get_system_info': return window.electronAPI.getSystemInfo();
+            case 'check_for_updates': return window.electronAPI.checkForUpdates();
+            default: return Promise.resolve(null);
+          }
+        }
+        return Promise.resolve(null);
+      }
+    };
+    window.__TAURI__ = window.__TAURI_INTERNALS__;
+    document.documentElement.classList.add('is-tauri');
+    console.log('[Lodestone Desktop] Bootstrap: desktop mode activated');
+
+    // Navigate to the remote SPA
+    window.location.replace('https://heylodestone.com/chat#/chat');
+  </script>
+</body>
+</html>

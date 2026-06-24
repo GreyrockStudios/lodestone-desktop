@@ -1,0 +1,9 @@
+node_modules/
+dist/
+ui/
+*.dmg
+*.exe
+*.AppImage
+*.deb
+.DS_Store
+Thumbs.db
