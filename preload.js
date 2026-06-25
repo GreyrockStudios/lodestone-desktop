@@ -1,39 +1,35 @@
-// ─── Lodestone Desktop — Electron Preload Script v0.5.3 ──────────────────────
-// Sets up the native bridge API. Desktop detection (__TAURI_INTERNALS__) is
-// injected via the lodestone:// protocol handler into the HTML response,
-// so it's already available before any page JS evaluates.
-// This preload adds electronAPI for IPC calls and is a safety net for detection.
+// ─── Lodestone Desktop — Electron Preload Script v0.5.6 ──────────────────────
+// Uses contextBridge.exposeInMainWorld for security (contextIsolation: true).
+// Desktop detection (__TAURI_INTERNALS__) is injected via the protocol handler.
+// This preload adds electronAPI for IPC calls and desktop detection.
 
-const { ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer } = require("electron");
 
-// ─── Desktop Detection (safety net — primary injection is via protocol handler) ─
-if (typeof window !== "undefined" && !window.__TAURI_INTERNALS__) {
-  window.__TAURI_INTERNALS__ = {
-    invoke: (cmd, args) => {
-      switch (cmd) {
-        case "set_badge_count": return ipcRenderer.invoke("set-badge-count", args?.count);
-        case "save_file": return ipcRenderer.invoke("save-file", args?.content, args?.filename, args?.filters);
-        case "read_file_contents": return ipcRenderer.invoke("read-file", args?.path);
-        case "get_app_version": return ipcRenderer.invoke("get-version");
-        case "get_system_info": return ipcRenderer.invoke("get-system-info");
-        case "check_for_updates": return ipcRenderer.invoke("check-for-updates");
-        default: return Promise.resolve(null);
-      }
-    },
-  };
-  window.__TAURI__ = window.__TAURI_INTERNALS__;
-  // Set CSS class when DOM is ready
-  if (document.documentElement) {
+// ─── Desktop Detection ───────────────────────────────────────────────────────
+const tauriInternals = {
+  invoke: (cmd, args) => {
+    switch (cmd) {
+      case "set_badge_count": return ipcRenderer.invoke("set-badge-count", args?.count);
+      case "save_file": return ipcRenderer.invoke("save-file", args?.content, args?.filename, args?.filters);
+      case "read_file_contents": return ipcRenderer.invoke("read-file", args?.path);
+      case "get_app_version": return ipcRenderer.invoke("get-version");
+      case "check_for_updates": return ipcRenderer.invoke("check-for-updates");
+      default: return Promise.resolve(null);
+    }
+  },
+};
+
+// Set CSS class when DOM is ready
+if (document.documentElement) {
+  document.documentElement.classList.add("is-tauri");
+} else {
+  document.addEventListener("DOMContentLoaded", () => {
     document.documentElement.classList.add("is-tauri");
-  } else {
-    document.addEventListener("DOMContentLoaded", () => {
-      document.documentElement.classList.add("is-tauri");
-    });
-  }
+  });
 }
 
-// ─── Electron API (exposed as window.electronAPI) ───────────────────────────
-window.electronAPI = {
+// ─── Electron API (exposed via contextBridge for security) ────────────────────
+const electronAPI = {
   // Native features
   setBadgeCount: (count) => ipcRenderer.invoke("set-badge-count", count),
   saveFile: (content, filename, filters) => ipcRenderer.invoke("save-file", content, filename, filters),
@@ -167,3 +163,10 @@ window.electronAPI = {
     listConnections: () => ipcRenderer.invoke("mcp:list-connections"),
   },
 };
+
+// ─── Expose APIs via contextBridge ──────────────────────────────────────────
+// With contextIsolation: true, we must use contextBridge instead of directly
+// assigning to window. This prevents renderer code from accessing Node/Electron APIs.
+contextBridge.exposeInMainWorld("electronAPI", electronAPI);
+contextBridge.exposeInMainWorld("__TAURI_INTERNALS__", tauriInternals);
+contextBridge.exposeInMainWorld("__TAURI__", tauriInternals);

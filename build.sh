@@ -6,7 +6,7 @@ echo "=== Lodestone Desktop Builder (Electron) ==="
 # Step 1: Pull the latest web frontend from the server
 echo "📦 Pulling latest web frontend..."
 mkdir -p ui
-rsync -avz --delete root@159.89.239.126:/var/www/lodestone/ ui/ --exclude 'updates' --exclude 'lodestone'
+rsync -avz --delete root@159.89.239.126:/var/www/lodestone/ ui/ --exclude 'updates' --exclude 'lodestone' --exclude 'downloads' --exclude '*.dmg' --exclude '*.exe' --exclude '*.blockmap' --exclude 'dist.bak' --exclude 'assets.bak.*'
 
 # Step 2: Install dependencies
 echo "📦 Installing dependencies..."

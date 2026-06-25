@@ -20,6 +20,78 @@
   const originalFetch = window.__original_fetch || window.fetch;
   window.__original_fetch = originalFetch;
 
+  // ─── Token Refresh (Desktop App) ────────────────────────────────────────────
+  // Proactively refresh the access token every 14 minutes (tokens expire at 15 min).
+  // Also intercepts 401 responses and retries with a fresh token.
+  // This is the desktop app equivalent of the server-side token-refresh.js patch.
+
+  const REFRESH_INTERVAL_MS = 14 * 60 * 1000; // 14 minutes
+  const REFRESH_ENDPOINT = '/api/auth/refresh';
+  const ACCESS_TOKEN_KEY = 'lodestone_access_token';
+  const REFRESH_TOKEN_KEY = 'lodestone_refresh_token';
+  let refreshPromise = null;
+  let refreshTimer = null;
+
+  async function refreshAccessToken() {
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (!refreshToken) return null;
+    try {
+      const response = await originalFetch(REFRESH_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.accessToken && data.refreshToken) {
+          localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
+          localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+          window.dispatchEvent(new CustomEvent('lodestone:token-refreshed', {
+            detail: { accessToken: data.accessToken, refreshToken: data.refreshToken, user: data.user }
+          }));
+          return data.accessToken;
+        }
+      }
+      // Refresh failed — clear tokens to force re-login
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      window.dispatchEvent(new CustomEvent('lodestone:token-expired'));
+      return null;
+    } catch (err) {
+      console.error('[Lodestone] Token refresh error:', err);
+      return null;
+    }
+  }
+
+  async function getRefreshedToken() {
+    if (refreshPromise) return refreshPromise;
+    refreshPromise = refreshAccessToken();
+    const result = await refreshPromise;
+    refreshPromise = null;
+    return result;
+  }
+
+  function startProactiveRefresh() {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(() => {
+      const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+      const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+      if (refreshToken && accessToken) {
+        console.log('[Lodestone] Proactive token refresh');
+        getRefreshedToken();
+      }
+    }, REFRESH_INTERVAL_MS);
+  }
+
+  // Start proactive refresh when tokens exist
+  startProactiveRefresh();
+
+  window.addEventListener('storage', (e) => {
+    if (e.key === ACCESS_TOKEN_KEY || e.key === REFRESH_TOKEN_KEY) {
+      if (localStorage.getItem(REFRESH_TOKEN_KEY)) startProactiveRefresh();
+    }
+  });
+
   // ─── Tier Detection ─────────────────────────────────────────────────────
   async function detectTier() {
     const token = localStorage.getItem('lodestone_access_token');
@@ -885,7 +957,42 @@
 
     // ─── Pass through everything else ────────────────────────────────────────
     // Auth, files, usage, keys, subscriptions, etc. go to the server
-    return originalFetch.call(this, input, init);
+    // With 401 → refresh token → retry logic
+    const response = await originalFetch.call(this, input, init);
+    if (response.status === 401) {
+      // Don't try to refresh auth endpoints
+      if (url.includes('/auth/login') || url.includes('/auth/register') || url.includes('/auth/refresh')) {
+        return response;
+      }
+      const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+      if (!refreshToken) {
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+        window.dispatchEvent(new CustomEvent('lodestone:token-expired'));
+        return response;
+      }
+      console.log('[Lodestone] 401 detected, attempting token refresh');
+      const newToken = await getRefreshedToken();
+      if (newToken) {
+        // Retry the original request with the new token
+        const newInit = { ...init };
+        if (newInit.headers) {
+          if (newInit.headers instanceof Headers) {
+            newInit.headers = new Headers(newInit.headers);
+            newInit.headers.set('Authorization', `Bearer ${newToken}`);
+          } else if (typeof newInit.headers === 'object') {
+            newInit.headers = { ...newInit.headers, Authorization: `Bearer ${newToken}` };
+          }
+        } else {
+          newInit.headers = { Authorization: `Bearer ${newToken}` };
+        }
+        return originalFetch.call(this, input, newInit);
+      }
+      // Refresh failed
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      window.dispatchEvent(new CustomEvent('lodestone:token-expired'));
+    }
+    return response;
   };
 
   // ─── Desktop-native tool execution ────────────────────────────────────────

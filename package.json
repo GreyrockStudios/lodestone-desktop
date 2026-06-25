@@ -1,7 +1,7 @@
 {
   "name": "lodestone",
   "version": "0.5.6",
-  "description": "Lodestone — Your AI brain, always learning",
+  "description": "Lodestone \u2014 Your AI brain, always learning",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -49,7 +49,18 @@
       "mcp-bridge.js",
       "mcp-servers.json",
       "protocol-handler.js",
-      "ui/**/*"
+      {
+        "from": "ui",
+        "to": "ui",
+        "filter": [
+          "**/*",
+          "!**/*.dmg",
+          "!**/*.zip",
+          "!**/*.blockmap",
+          "!**/*.exe",
+          "!**/dist.bak"
+        ]
+      }
     ],
     "asarUnpack": [
       "node_modules/better-sqlite3/**/*"

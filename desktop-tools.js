@@ -561,10 +561,24 @@ function registerToolHandlers(mainWindow, store) {
       }
     }
 
-    const isAllowed = ALLOWED_COMMANDS.some(ac => fullCmd.startsWith(ac));
+    // Parse the first word (command binary) and check against allowlist
+    // This prevents "git status; rm -rf /" bypassing the git status check
+    const firstWord = fullCmd.split(/\s+/)[0];
+    const isAllowed = ALLOWED_COMMANDS.some(ac => {
+      const acCmd = ac.split(/\s+/)[0]; // e.g. "git" from "git status"
+      return firstWord === acCmd || fullCmd === ac;
+    });
     if (!isAllowed) {
       auditLog("run-command", fullCmd, `BLOCKED: not in allowlist`, tier);
       return { error: `Command not allowed: ${fullCmd.split(" ")[0]}. Allowed: ${ALLOWED_COMMANDS.join(", ")}` };
+    }
+
+    // Block shell metacharacters to prevent injection
+    // (already checked blockedPatterns above, but also strip from execution)
+    const sanitizedCmd = fullCmd.replace(/[;&|`$()]/g, '');
+    if (sanitizedCmd !== fullCmd) {
+      auditLog("run-command", fullCmd, "BLOCKED: shell metacharacters", tier);
+      return { error: "Command blocked: contains shell metacharacters (;, &, |, `, $, parentheses)" };
     }
 
     // Minimal tier: no commands
