@@ -297,6 +297,11 @@ function showWindow() { if (mainWindow) { mainWindow.show(); mainWindow.focus();
 
 // ─── Menu ─────────────────────────────────────────────────────────────────────
 function createMenu() {
+  // Hide the menu bar on Windows — the SPA has its own navigation in the sidebar
+  if (process.platform === 'win32') {
+    Menu.setApplicationMenu(null)
+    return
+  }
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: "Lodestone", submenu: [
       { label: "About Lodestone", click: () => dialog.showMessageBoxSync(mainWindow, { type: "info", title: "About Lodestone", message: `Lodestone v${app.getVersion()}`, detail: "Your AI, always learning.\n\nBuilt by Greyrock Studio", buttons: ["OK"] }) },
