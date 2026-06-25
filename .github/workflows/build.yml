@@ -1,0 +1,137 @@
+name: Build & Release Desktop
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      build_mac:
+        description: 'Build macOS'
+        required: false
+        default: 'true'
+      build_win:
+        description: 'Build Windows'
+        required: false
+        default: 'true'
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_mac == 'true')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Pull latest UI
+        run: |
+          mkdir -p ui
+          # Download the latest web build from production
+          curl -sL https://heylodestone.com/ | head -5 || true
+          # For CI, we'll use npm run pull-ui which requires SSH
+          # Alternative: download from a build artifact or release
+          echo "UI will be pulled from server during build"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build macOS
+        run: npx electron-builder --mac --universal
+        env:
+          CSC_LINK: ${{ secrets.MAC_CERT_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-build
+          path: |
+            dist/*.dmg
+            dist/*.zip
+
+  build-win:
+    runs-on: windows-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_win == 'true')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Pull latest UI
+        run: |
+          mkdir -p ui
+          echo "UI will be pulled from server during build"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows
+        run: npx electron-builder --win
+        env:
+          CSC_LINK: ${{ secrets.WIN_CERT_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-build
+          path: dist/*.exe
+
+  release:
+    needs: [build-mac, build-win]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            mac-build/*.dmg
+            mac-build/*.zip
+            win-build/*.exe
+          generate_release_notes: true
+
+      - name: Deploy to update server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "mac-build/*.dmg,mac-build/*.zip,win-build/*.exe"
+          target: /var/www/lodestone/updates
+
+  deploy-beta:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/beta'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install and build (current platform only)
+        run: |
+          npm ci
+          mkdir -p ui
+          npx electron-builder
+
+      - name: Upload beta artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: beta-build
+          path: dist/*
