@@ -1058,12 +1058,31 @@
           }))});
         }
 
-        // ── Calculator (local JS) ──
+        // ── Calculator (local JS, safe eval) ──
         case 'calculator': {
           try {
             // Safe math evaluation — only allow numbers, operators, and math functions
             const expr = args.expression.replace(/[^0-9+\-*/().%\s^piePIEsincotaglqrtabflorpw]/g, '');
-            const fn = new Function(`with(Math){return(${expr})}`);
+            // Use explicit Math object instead of with(Math) for security and strict mode compatibility
+            const mathExpr = expr
+              .replace(/\bsin\b/g, 'Math.sin')
+              .replace(/\bcos\b/g, 'Math.cos')
+              .replace(/\btan\b/g, 'Math.tan')
+              .replace(/\basin\b/g, 'Math.asin')
+              .replace(/\bacos\b/g, 'Math.acos')
+              .replace(/\batan\b/g, 'Math.atan')
+              .replace(/\blog\b/g, 'Math.log')
+              .replace(/\bln\b/g, 'Math.log')
+              .replace(/\bsqrt\b/g, 'Math.sqrt')
+              .replace(/\babs\b/g, 'Math.abs')
+              .replace(/\bfloor\b/g, 'Math.floor')
+              .replace(/\bceil\b/g, 'Math.ceil')
+              .replace(/\bround\b/g, 'Math.round')
+              .replace(/\bpow\b/g, 'Math.pow')
+              .replace(/\bPI\b/g, 'Math.PI')
+              .replace(/\bE\b/g, 'Math.E')
+              .replace(/\^/g, '**');
+            const fn = new Function(`"use strict"; return(${mathExpr})`);
             const result = fn();
             return JSON.stringify({ result: result, expression: args.expression });
           } catch (e) {

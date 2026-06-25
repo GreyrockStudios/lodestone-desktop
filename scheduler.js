@@ -96,7 +96,25 @@ function initScheduler(window) {
     scheduleTask(task);
   }
 
-  console.log(`[Lodestone] Scheduler initialized with ${tasks.length} active tasks`);
+  // Recover missed tasks: if a task's next_run is in the past, fire it
+  const now = new Date();
+  let recoveredCount = 0;
+  for (const task of tasks) {
+    if (task.next_run) {
+      const nextRun = new Date(task.next_run);
+      // If next_run was more than 5 minutes ago, we missed it
+      if (nextRun.getTime() < now.getTime() - 5 * 60 * 1000) {
+        console.log(`[Lodestone] Recovering missed task: ${task.name} (was due at ${task.next_run})`);
+        // Only recover if we haven't already run it recently
+        if (!task.last_run || new Date(task.last_run).getTime() < nextRun.getTime()) {
+          fireTask(task);
+          recoveredCount++;
+        }
+      }
+    }
+  }
+
+  console.log(`[Lodestone] Scheduler initialized with ${tasks.length} active tasks${recoveredCount > 0 ? `, recovered ${recoveredCount} missed tasks` : ''}`);
 }
 
 // ─── Simple cron matcher ─────────────────────────────────────────────────

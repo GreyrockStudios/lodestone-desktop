@@ -43,9 +43,28 @@ class MCPServer {
       this.clients.push(socket)
     })
 
-    this.server.listen(port, '127.0.0.1', () => {
-      console.log(`[MCP] Server listening on 127.0.0.1:${port}`)
+    const tryListen = (p) => {
+      this.server.listen(p, '127.0.0.1', () => {
+        console.log(`[MCP] Server listening on 127.0.0.1:${p}`)
+      })
+    }
+
+    this.server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        if (port < 9530) {
+          console.log(`[MCP] Port ${port} in use, trying ${port + 1}...`)
+          port++
+          tryListen(port)
+        } else {
+          console.error(`[MCP] Could not find available port after 9515-9530`)
+          this.server = null
+        }
+      } else {
+        console.error(`[MCP] Server error:`, err)
+      }
     })
+
+    tryListen(port)
   }
 
   stop() {

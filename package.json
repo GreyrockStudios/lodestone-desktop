@@ -11,7 +11,7 @@
     "build:win": "electron-builder --win",
     "build:linux": "electron-builder --linux",
     "build": "electron-builder",
-    "pull-ui": "rsync -avz --delete root@159.89.239.126:/var/www/lodestone/ ui/ --exclude updates --exclude lodestone",
+    "pull-ui": "rsync -avz --delete root@159.89.239.126:/var/www/lodestone/ ui/ --exclude updates --exclude lodestone --exclude downloads --exclude '*.dmg' --exclude '*.exe' --exclude '*.blockmap' --exclude dist.bak --exclude 'assets.bak.*' --exclude .DS_Store --exclude '*.pkg' --exclude '*.zip'",
     "postinstall": "electron-builder install-app-deps"
   },
   "author": "Greyrock Studio",
