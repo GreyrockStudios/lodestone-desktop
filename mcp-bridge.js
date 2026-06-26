@@ -84,7 +84,7 @@ class MCPServer {
         result: {
           protocolVersion: '2024-11-05',
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: 'Lodestone', version: '0.5.5' }
+          serverInfo: { name: 'Lodestone', version: '0.1.0' }
         }
       })
       return
@@ -188,7 +188,7 @@ class MCPClient {
     const initResult = await new Promise((resolve, reject) => {
       const id = ++msgId
       pending.set(id, { resolve, reject })
-      send({ jsonrpc: '2.0', id, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'Lodestone', version: '0.5.5' } } })
+      send({ jsonrpc: '2.0', id, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'Lodestone', version: '0.1.0' } } })
       setTimeout(() => { pending.delete(id); reject(new Error('Initialize timeout')) }, 10000)
     })
 
