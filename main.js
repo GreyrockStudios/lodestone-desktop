@@ -1,4 +1,4 @@
-// ─── Lodestone Desktop — Electron Main Process v0.1.3 ──────────────────────
+// ─── Lodestone Desktop — Electron Main Process v0.1.4 ──────────────────────
 // Application wrapper for heylodestone.com chat interface.
 // Uses protocol.handle with a custom 'lodestone://' scheme to inject desktop
 // detection into HTML responses before the SPA evaluates its JS.

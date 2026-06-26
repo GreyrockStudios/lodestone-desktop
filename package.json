@@ -1,6 +1,6 @@
 {
   "name": "lodestone",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Lodestone \u2014 Your AI brain, always learning",
   "main": "main.js",
   "scripts": {
