@@ -1,4 +1,4 @@
-// ─── Lodestone Desktop — Electron Preload Script v0.1.0 ──────────────────────
+// ─── Lodestone Desktop — Electron Preload Script v0.1.3 ──────────────────────
 // Uses contextBridge.exposeInMainWorld for security (contextIsolation: true).
 // Desktop detection (__TAURI_INTERNALS__) is injected via the protocol handler.
 // This preload adds electronAPI for IPC calls and desktop detection.
