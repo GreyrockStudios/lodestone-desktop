@@ -13,6 +13,7 @@ const https = require("https");
 const Store = require("electron-store");
 const { autoUpdater } = require("electron-updater");
 const brain = require("./brain");
+const proactive = require("./brain/proactive");
 const desktopTools = require("./desktop-tools");
 const scheduler = require("./scheduler");
 const { initMCP, cleanupMCP, autoStartBundledServers } = require("./mcp-bridge");
@@ -686,6 +687,7 @@ app.whenReady().then(() => {
   desktopTools.registerToolHandlers(mainWindow, store);
   scheduler.initScheduler(mainWindow);
   brain.init(); // Initialize local agent brain — identity, memory engine, agent loop
+  proactive.registerBrainTasks(); // Register morning brief + commitment watchdog
   // Initialize MCP bridge - exposes Lodestone tools via Model Context Protocol
   const mcpTools = desktopTools.getTools().map(t => ({
     name: t.name,

@@ -301,9 +301,23 @@ function fireCheckIn(task) {
 }
 
 function fireReport(task) {
+  // Check if this is the brain morning brief
+  let reportBody = task.message || "Your scheduled report is ready";
+  let navigateTo = '#/chat';
+
+  try {
+    const proactive = require("./brain/proactive");
+    if (task.id === "brain_morning_brief" || task.name === "Morning Brief") {
+      reportBody = proactive.generateMorningBrief();
+      navigateTo = '#/brain?tab=dashboard';
+    }
+  } catch (e) {
+    // Brain not available, use default
+  }
+
   const notif = new Notification({
     title: `📊 Report: ${task.name}`,
-    body: task.message || "Your scheduled report is ready",
+    body: reportBody,
     icon: path.join(__dirname, "assets", "icon.png"),
     silent: false,
   });
@@ -313,11 +327,11 @@ function fireReport(task) {
       mainWindow.show();
       mainWindow.focus();
       mainWindow.webContents.executeJavaScript(`
-        window.location.hash = '#/chat';
+        window.location.hash = '${navigateTo}';
         setTimeout(() => {
           const input = document.querySelector('textarea, input[type="text"]');
           if (input) {
-            input.value = ${JSON.stringify(`Generate my ${task.name}: ${task.message}`)};
+            input.value = ${JSON.stringify(`Show me my morning brief`)};
             input.dispatchEvent(new Event('input', { bubbles: true }));
           }
         }, 500);
@@ -329,7 +343,20 @@ function fireReport(task) {
 }
 
 function fireSystemCheck(task) {
-  // Run a quick system check and notify with results
+  // Check if this is the commitment watchdog
+  if (task.id === "brain_commitment_watchdog" || task.name === "Commitment Watchdog") {
+    try {
+      const proactive = require("./brain/proactive");
+      const result = proactive.checkOverdueCommitments();
+      // checkOverdueCommitments already shows notifications for overdue items
+      // Nothing more to do — if there are no overdue items, result is null
+      return;
+    } catch (e) {
+      // Brain not available, fall through to generic system check
+    }
+  }
+
+  // Default system check
   const os = require("os");
   const freeMem = Math.round(os.freemem() / 1024 / 1024 / 1024);
   const totalMem = Math.round(os.totalmem() / 1024 / 1024 / 1024);
