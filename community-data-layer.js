@@ -329,6 +329,60 @@
         console.warn('[Lodestone] Failed to push commitments:', e.message);
       }
 
+      // Push brain identity (Soul, Identity, Rules, Heartbeat, UserProfile)
+      try {
+        if (window.electronAPI?.brain) {
+          const [soul, identity, rules, heartbeat, profile] = await Promise.all([
+            window.electronAPI.brain.getSoul(),
+            window.electronAPI.brain.getIdentity(),
+            window.electronAPI.brain.getRules(),
+            window.electronAPI.brain.getHeartbeat(),
+            window.electronAPI.brain.getUserProfile(),
+          ]);
+          if (soul?.content) await syncToServer('/api/brain/soul', 'PUT', { content: soul.content });
+          if (identity?.name || identity?.role || identity?.description) await syncToServer('/api/brain/identity', 'PUT', identity);
+          if (heartbeat?.active_task || heartbeat?.next_steps || heartbeat?.services) await syncToServer('/api/brain/heartbeat', 'PUT', heartbeat);
+          if (profile?.name || profile?.communication_style || profile?.timezone) await syncToServer('/api/brain/user-profile', 'PUT', profile);
+          for (const rule of (rules || [])) {
+            await syncToServer('/api/brain/rules', 'POST', { rule: rule.rule, category: rule.category, priority: rule.priority });
+            pushed++;
+          }
+        }
+      } catch (e) {
+        console.warn('[Lodestone] Failed to push brain identity:', e.message);
+      }
+
+      // Pull brain identity from server
+      try {
+        if (window.electronAPI?.brain) {
+          const [serverSoul, serverIdentity, serverRules, serverHeartbeat, serverProfile] = await Promise.all([
+            originalFetch('/api/brain/soul', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.ok ? r.json() : null),
+            originalFetch('/api/brain/identity', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.ok ? r.json() : null),
+            originalFetch('/api/brain/rules', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.ok ? r.json() : null),
+            originalFetch('/api/brain/heartbeat', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.ok ? r.json() : null),
+            originalFetch('/api/brain/user-profile', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.ok ? r.json() : null),
+          ]);
+          // Only overwrite local if server has data (last-write-wins)
+          if (serverSoul?.content) await window.electronAPI.brain.setSoul(serverSoul.content);
+          if (serverIdentity?.name || serverIdentity?.role) await window.electronAPI.brain.setIdentity(serverIdentity);
+          if (serverHeartbeat?.active_task) await window.electronAPI.brain.setHeartbeat(serverHeartbeat);
+          if (serverProfile?.name || serverProfile?.communication_style) await window.electronAPI.brain.setUserProfile(serverProfile);
+          // Rules: merge — add server rules that don't exist locally
+          if (serverRules?.rules) {
+            const localRules = await window.electronAPI.brain.getRules();
+            const localRuleTexts = new Set((localRules || []).map(r => r.rule));
+            for (const rule of serverRules.rules) {
+              if (!localRuleTexts.has(rule.rule)) {
+                await window.electronAPI.brain.addRule(rule.rule, rule.category, rule.priority);
+              }
+            }
+          }
+          console.log('[Lodestone] Brain identity sync: pulled from server');
+        }
+      } catch (e) {
+        console.warn('[Lodestone] Failed to pull brain identity:', e.message);
+      }
+
       console.log('[Lodestone] Push sync complete. Pushed', pushed, 'records.');
     } catch (e) {
       console.warn('[Lodestone] Push sync failed:', e.message);
