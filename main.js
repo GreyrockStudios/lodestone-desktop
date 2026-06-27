@@ -505,6 +505,18 @@ ipcMain.handle("brain:extract-entities", (_e, text) => brain.extractEntities(tex
 ipcMain.handle("brain:link-memory-entities", (_e, memoryId, content) => brain.linkMemoryToEntities(memoryId, content));
 ipcMain.handle("brain:get-related-entities", (_e, memoryId, depth) => brain.getRelatedEntities(memoryId, depth));
 
+// Self-improvement
+ipcMain.handle("brain:create-prediction", (_e, data) => brain.createPrediction(data));
+ipcMain.handle("brain:get-predictions", (_e, status) => brain.getPredictions(status));
+ipcMain.handle("brain:resolve-prediction", (_e, id, outcome, correct) => brain.resolvePrediction(id, outcome, correct));
+ipcMain.handle("brain:get-calibration", () => brain.getCalibration());
+ipcMain.handle("brain:detect-drift", (_e, messages) => brain.detectDrift(messages));
+ipcMain.handle("brain:detect-correction", (_e, userMsg, assistantMsg) => brain.detectCorrection(userMsg, assistantMsg));
+ipcMain.handle("brain:learn-from-correction", (_e, correction) => brain.learnFromCorrection(correction));
+
+// Sleep cycle
+ipcMain.handle("brain:run-sleep-cycle", () => brain.runSleepCycle());
+
 // Agent loop (for local-first chat with tools)
 ipcMain.handle("brain:agent-loop", async (_e, params) => {
   const { messages, userMessage, conversationId } = params;

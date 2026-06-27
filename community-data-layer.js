@@ -467,6 +467,16 @@
           null // apiKey not needed for local extraction
         ).catch(err => console.warn('[Brain] Deep extraction failed:', err));
       }
+      // Behavioral learning: detect corrections
+      if (userMessage && assistantMessage && window.electronAPI?.brain?.detectCorrection) {
+        const correction = await window.electronAPI.brain.detectCorrection(userMessage, assistantMessage);
+        if (correction) {
+          console.log(`[Brain] Detected correction: ${correction.extracted_rule}`);
+          if (window.electronAPI?.brain?.learnFromCorrection) {
+            await window.electronAPI.brain.learnFromCorrection(correction);
+          }
+        }
+      }
     } catch (err) {
       console.warn('[Brain] Memory extraction failed:', err);
     }
@@ -1027,6 +1037,61 @@
       const body = init?.body ? JSON.parse(init.body) : {};
       const entities = await window.electronAPI.brain.extractEntities(body.text || '');
       return new Response(JSON.stringify({ entities }), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // ─── Self-Improvement ────────────────────────────────────────────────────
+
+    // POST /api/brain/predictions
+    if (url === '/api/brain/predictions' && method === 'POST') {
+      const body = init?.body ? JSON.parse(init.body) : {};
+      const pred = await window.electronAPI.brain.createPrediction(body);
+      return new Response(JSON.stringify(pred), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // GET /api/brain/predictions
+    if (url.startsWith('/api/brain/predictions') && method === 'GET') {
+      const params = new URL(url, 'http://localhost').searchParams;
+      const status = params.get('status') || 'active';
+      const predictions = await window.electronAPI.brain.getPredictions(status);
+      return new Response(JSON.stringify({ predictions }), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // PATCH /api/brain/predictions/:id/resolve
+    const predResolveMatch = url.match(/^\/api\/brain\/predictions\/([^/]+)\/resolve$/);
+    if (predResolveMatch && method === 'PATCH') {
+      const body = init?.body ? JSON.parse(init.body) : {};
+      const resolved = await window.electronAPI.brain.resolvePrediction(predResolveMatch[1], body.outcome, body.correct);
+      return new Response(JSON.stringify(resolved), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // GET /api/brain/calibration
+    if (url === '/api/brain/calibration' && method === 'GET') {
+      const calibration = await window.electronAPI.brain.getCalibration();
+      return new Response(JSON.stringify(calibration), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // POST /api/brain/drift-detection
+    if (url === '/api/brain/drift-detection' && method === 'POST') {
+      const body = init?.body ? JSON.parse(init.body) : {};
+      const drift = await window.electronAPI.brain.detectDrift(body.messages || []);
+      return new Response(JSON.stringify(drift), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // POST /api/brain/correction-detection
+    if (url === '/api/brain/correction-detection' && method === 'POST') {
+      const body = init?.body ? JSON.parse(init.body) : {};
+      const correction = await window.electronAPI.brain.detectCorrection(body.userMessage, body.assistantMessage);
+      if (correction) {
+        const learned = await window.electronAPI.brain.learnFromCorrection(correction);
+        return new Response(JSON.stringify({ correction, learned }), { headers: { 'content-type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ correction: null }), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // POST /api/brain/sleep-cycle
+    if (url === '/api/brain/sleep-cycle' && method === 'POST') {
+      const report = await window.electronAPI.brain.runSleepCycle();
+      return new Response(JSON.stringify(report), { headers: { 'content-type': 'application/json' } });
     }
 
     // ─── Folders ────────────────────────────────────────────────────────────

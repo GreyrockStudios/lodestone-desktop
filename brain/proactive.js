@@ -120,6 +120,7 @@ function updateHeartbeat() {
 
 function registerBrainTasks() {
   const database = db.getDb();
+  const { runSleepCycle } = require("./sleep-cycle");
 
   // Morning Brief — 8am daily
   const existingBrief = database.prepare("SELECT id FROM scheduled_tasks WHERE name = ?").get("Morning Brief");
@@ -150,6 +151,22 @@ function registerBrainTasks() {
       "system_check",
       "0 * * * *",
       "Check overdue commitments"
+    );
+  }
+
+  // Sleep Cycle — 3am daily (consolidation, cleanup, memory promotion)
+  const existingSleep = database.prepare("SELECT id FROM scheduled_tasks WHERE name = ?").get("Sleep Cycle");
+  if (!existingSleep) {
+    database.prepare(`
+      INSERT INTO scheduled_tasks (id, name, description, task_type, cron_expr, message, is_active, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
+    `).run(
+      "brain_sleep_cycle",
+      "Sleep Cycle",
+      "Nightly consolidation: promote memories, archive stale data, deduplicate, review predictions",
+      "system_check",
+      "0 3 * * *",
+      "Run sleep cycle consolidation"
     );
   }
 }

@@ -15,6 +15,8 @@ const { migrateIdentityTables, buildSystemPrompt, ...identityApi } = require("./
 const memoryEngine = require("./memory-engine");
 const { agentLoop, executeTool, TOOL_DEFINITIONS } = require("./agent-loop");
 const knowledge = require("./knowledge");
+const selfImprovement = require("./self-improvement");
+const { runSleepCycle } = require("./sleep-cycle");
 
 let initialized = false;
 
@@ -60,6 +62,9 @@ function init() {
     CREATE INDEX IF NOT EXISTS idx_edges_source ON memory_edges(source_id);
     CREATE INDEX IF NOT EXISTS idx_edges_target ON memory_edges(target_id);
   `);
+
+  // Migrate self-improvement tables
+  selfImprovement.migrateSelfImprovement(database);
 
   // Ensure commitments table has all needed columns
   try {
@@ -111,6 +116,10 @@ module.exports = {
   ...memoryEngine,
   // Knowledge
   ...knowledge,
+  // Self-improvement
+  ...selfImprovement,
+  // Sleep cycle
+  runSleepCycle,
   // Agent
   agentLoop,
   executeTool,

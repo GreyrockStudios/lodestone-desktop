@@ -348,11 +348,27 @@ function fireSystemCheck(task) {
     try {
       const proactive = require("./brain/proactive");
       const result = proactive.checkOverdueCommitments();
-      // checkOverdueCommitments already shows notifications for overdue items
-      // Nothing more to do — if there are no overdue items, result is null
       return;
     } catch (e) {
       // Brain not available, fall through to generic system check
+    }
+  }
+
+  // Sleep Cycle — nightly consolidation
+  if (task.id === "brain_sleep_cycle" || task.name === "Sleep Cycle") {
+    try {
+      const { runSleepCycle } = require("./brain/sleep-cycle");
+      const report = runSleepCycle();
+      const notif = new Notification({
+        title: "🧠 Sleep Cycle Complete",
+        body: `Promoted: ${report.promoted}, Archived: ${report.archived}, Cleaned: ${report.cleaned}`,
+        icon: path.join(__dirname, "assets", "icon.png"),
+        silent: true,
+      });
+      notif.show();
+      return;
+    } catch (e) {
+      // Fall through to generic system check
     }
   }
 

@@ -192,6 +192,18 @@ const electronAPI = {
     linkMemoryEntities: (memoryId, content) => ipcRenderer.invoke('brain:link-memory-entities', memoryId, content),
     getRelatedEntities: (memoryId, depth) => ipcRenderer.invoke('brain:get-related-entities', memoryId, depth),
 
+    // Self-improvement
+    createPrediction: (data) => ipcRenderer.invoke('brain:create-prediction', data),
+    getPredictions: (status) => ipcRenderer.invoke('brain:get-predictions', status),
+    resolvePrediction: (id, outcome, correct) => ipcRenderer.invoke('brain:resolve-prediction', id, outcome, correct),
+    getCalibration: () => ipcRenderer.invoke('brain:get-calibration'),
+    detectDrift: (messages) => ipcRenderer.invoke('brain:detect-drift', messages),
+    detectCorrection: (userMsg, assistantMsg) => ipcRenderer.invoke('brain:detect-correction', userMsg, assistantMsg),
+    learnFromCorrection: (correction) => ipcRenderer.invoke('brain:learn-from-correction', correction),
+
+    // Sleep cycle
+    runSleepCycle: () => ipcRenderer.invoke('brain:run-sleep-cycle'),
+
     // Agent loop
     agentLoop: (params) => ipcRenderer.invoke('brain:agent-loop', params),
     executeTool: (toolName, args) => ipcRenderer.invoke('brain:execute-tool', toolName, args),
