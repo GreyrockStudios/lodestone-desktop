@@ -504,6 +504,8 @@ ipcMain.handle("brain:smart-retrieve", (_e, query, limit) => brain.smartRetrieve
 ipcMain.handle("brain:extract-entities", (_e, text) => brain.extractEntities(text));
 ipcMain.handle("brain:link-memory-entities", (_e, memoryId, content) => brain.linkMemoryToEntities(memoryId, content));
 ipcMain.handle("brain:get-related-entities", (_e, memoryId, depth) => brain.getRelatedEntities(memoryId, depth));
+ipcMain.handle("brain:detect-topic", (_e, messages) => { const { detectTopic } = require("./brain/topic-engine"); return detectTopic(messages); });
+ipcMain.handle("brain:topic-scoped-retrieve", (_e, messages, query, limit) => { const { detectTopic, topicScopedRetrieve } = require("./brain/topic-engine"); const topic = detectTopic(messages); return topicScopedRetrieve(topic, query, limit); });
 
 // Self-improvement
 ipcMain.handle("brain:create-prediction", (_e, data) => brain.createPrediction(data));

@@ -304,7 +304,7 @@ async function agentLoop({
   const database = db.getDb();
 
   // 1. Build system prompt from identity layers + relevant memories
-  const systemPrompt = await buildSystemPrompt(null, userMessage, { maxTokens: 6000 });
+  const systemPrompt = await buildSystemPrompt(null, userMessage, { maxTokens: 6000, conversationHistory: messages });
 
   // 2. Compress history to fit context window
   const historyMessages = compressHistory(messages, MAX_CONTEXT_MESSAGES);
@@ -320,6 +320,14 @@ async function agentLoop({
   const extracted = extractFromMessage(userMessage);
   if (extracted.length > 0) {
     ingestMemories(extracted);
+    // Auto-tag with current topic
+    const { detectTopic, autoTagMemory } = require("./topic-engine");
+    const topic = detectTopic(messages);
+    if (topic) {
+      for (const mem of extracted) {
+        autoTagMemory(mem.id, mem.content, topic);
+      }
+    }
   }
 
   // 5. Agent loop

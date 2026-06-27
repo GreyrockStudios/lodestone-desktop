@@ -128,6 +128,7 @@ async function buildSystemPrompt(userId = null, currentMessage = "", options = {
   const database = db.getDb();
   const sections = [];
   const { smartRetrieve } = require("./knowledge");
+  const { topicScopedRetrieve, detectTopic } = require("./topic-engine");
 
   // 1. Soul — core personality
   const soul = database.prepare("SELECT content FROM identity_soul WHERE id = ?").get("default");
@@ -183,8 +184,10 @@ async function buildSystemPrompt(userId = null, currentMessage = "", options = {
     }
   }
 
-  // 6. Relevant memories — smart-ranked by recency, importance, entity matches
-  const memories = smartRetrieve(currentMessage, 15);
+  // 6. Relevant memories — topic-scoped if a topic is detected, otherwise smart-ranked
+  const recentMessages = options.conversationHistory || [];
+  const topic = detectTopic(recentMessages);
+  const memories = topicScopedRetrieve(topic, currentMessage, 15);
   if (memories.length > 0) {
     const memText = memories.map(m => `- [${m.category}] ${m.content} (importance: ${m.importance})`).join("\n");
     sections.push({ header: "Memories", content: memText, priority: IDENTITY_LAYERS.memories.priority });

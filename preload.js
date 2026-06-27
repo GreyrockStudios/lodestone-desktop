@@ -191,6 +191,8 @@ const electronAPI = {
     extractEntities: (text) => ipcRenderer.invoke('brain:extract-entities', text),
     linkMemoryEntities: (memoryId, content) => ipcRenderer.invoke('brain:link-memory-entities', memoryId, content),
     getRelatedEntities: (memoryId, depth) => ipcRenderer.invoke('brain:get-related-entities', memoryId, depth),
+    detectTopic: (messages) => ipcRenderer.invoke('brain:detect-topic', messages),
+    topicScopedRetrieve: (messages, query, limit) => ipcRenderer.invoke('brain:topic-scoped-retrieve', messages, query, limit),
 
     // Self-improvement
     createPrediction: (data) => ipcRenderer.invoke('brain:create-prediction', data),

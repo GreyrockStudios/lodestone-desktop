@@ -116,6 +116,8 @@ module.exports = {
   ...memoryEngine,
   // Knowledge
   ...knowledge,
+  // Topic engine
+  ...require("./topic-engine"),
   // Self-improvement
   ...selfImprovement,
   // Sleep cycle
