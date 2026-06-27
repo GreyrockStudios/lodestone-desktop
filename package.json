@@ -1,6 +1,6 @@
 {
   "name": "lodestone",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "description": "Lodestone \u2014 Your AI brain, always learning",
   "main": "main.js",
   "scripts": {
@@ -46,6 +46,13 @@
       "desktop-tools.js",
       "scheduler.js",
       "community-data-layer.js",
+      {
+        "from": "brain",
+        "to": "brain",
+        "filter": [
+          "**/*.js"
+        ]
+      },
       "mcp-bridge.js",
       "mcp-servers.json",
       "protocol-handler.js",
