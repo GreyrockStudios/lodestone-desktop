@@ -327,6 +327,9 @@ function getRules() {
 
 function addRule(rule, category = "general", priority = 0) {
   const database = db.getDb();
+  // Deduplicate: don't add the same rule text twice
+  const existing = database.prepare("SELECT id FROM identity_rules WHERE rule = ? AND category = ?").get(rule, category);
+  if (existing) return existing.id;
   const result = database.prepare("INSERT INTO identity_rules (rule, category, priority) VALUES (?, ?, ?)").run(rule, category, priority);
   return result.lastInsertRowid;
 }
