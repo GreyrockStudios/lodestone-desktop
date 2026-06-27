@@ -708,10 +708,16 @@
       });
       syncToServer(`/api/chat/conversations/${messagesMatch[1]}/messages`, 'POST', msg);
 
-      // Brain: Extract memories from assistant messages
+      // Brain: Extract memories from messages (both user and assistant for Pro/Studio)
       if (body.role === 'assistant' && body.content) {
-        // We don't have the user message here, but we can extract from the assistant response
-        extractBrainMemories('', body.content, messagesMatch[1]);
+        // Try to get the user message from local DB for context
+        try {
+          const msgs = await window.electronAPI.db.getMessages(messagesMatch[1]);
+          const lastUserMsg = msgs?.filter(m => m.role === 'user').pop()?.content || '';
+          extractBrainMemories(lastUserMsg, body.content, messagesMatch[1]);
+        } catch (e) {
+          extractBrainMemories('', body.content, messagesMatch[1]);
+        }
       }
 
       return new Response(JSON.stringify(msg), {
