@@ -953,6 +953,21 @@
       }
     }
 
+    // GET /api/knowledge-graph — alias for /api/memory/graph (KnowledgeGraphPanel uses this)
+    if (url === '/api/knowledge-graph' && method === 'GET') {
+      // Reuse the memory/graph logic by creating a sub-request
+      const graphRes = await window.fetch('/api/memory/graph', { method: 'GET' });
+      if (graphRes.ok) {
+        const graphData = await graphRes.json();
+        return new Response(JSON.stringify(graphData), {
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      return new Response(JSON.stringify({ nodes: [], edges: [] }), {
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
     // ─── Commitments ───────────────────────────────────────────────────────
 
     // GET /api/chat/commitments
