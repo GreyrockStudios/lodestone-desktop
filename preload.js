@@ -186,6 +186,12 @@ const electronAPI = {
     // Heartbeat
     heartbeat: () => ipcRenderer.invoke('brain:heartbeat'),
 
+    // Knowledge engine
+    smartRetrieve: (query, limit) => ipcRenderer.invoke('brain:smart-retrieve', query, limit),
+    extractEntities: (text) => ipcRenderer.invoke('brain:extract-entities', text),
+    linkMemoryEntities: (memoryId, content) => ipcRenderer.invoke('brain:link-memory-entities', memoryId, content),
+    getRelatedEntities: (memoryId, depth) => ipcRenderer.invoke('brain:get-related-entities', memoryId, depth),
+
     // Agent loop
     agentLoop: (params) => ipcRenderer.invoke('brain:agent-loop', params),
     executeTool: (toolName, args) => ipcRenderer.invoke('brain:execute-tool', toolName, args),

@@ -499,6 +499,12 @@ ipcMain.handle("brain:complete-commitment", (_e, id) => brain.completeCommitment
 // Heartbeat (proactive intelligence)
 ipcMain.handle("brain:heartbeat", () => brain.heartbeat());
 
+// Knowledge engine
+ipcMain.handle("brain:smart-retrieve", (_e, query, limit) => brain.smartRetrieve(query, limit));
+ipcMain.handle("brain:extract-entities", (_e, text) => brain.extractEntities(text));
+ipcMain.handle("brain:link-memory-entities", (_e, memoryId, content) => brain.linkMemoryToEntities(memoryId, content));
+ipcMain.handle("brain:get-related-entities", (_e, memoryId, depth) => brain.getRelatedEntities(memoryId, depth));
+
 // Agent loop (for local-first chat with tools)
 ipcMain.handle("brain:agent-loop", async (_e, params) => {
   const { messages, userMessage, conversationId } = params;

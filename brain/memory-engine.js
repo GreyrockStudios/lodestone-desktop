@@ -125,6 +125,7 @@ function isDuplicate(content, existingMemories, threshold = 0.5) {
 
 function ingestMemories(extracted, confidenceThreshold = 0.8) {
   const database = db.getDb();
+  const { linkMemoryToEntities } = require("./knowledge");
 
   // Get existing memories for dedup
   const existing = database.prepare("SELECT content FROM memories WHERE is_archived = 0").all();
@@ -151,6 +152,8 @@ function ingestMemories(extracted, confidenceThreshold = 0.8) {
         mem.source || null
       );
       directCount++;
+      // Auto-link entities to this memory in the knowledge graph
+      try { linkMemoryToEntities(id, mem.content); } catch (e) { /* non-critical */ }
     } else {
       // Lower confidence — stage for review
       try {

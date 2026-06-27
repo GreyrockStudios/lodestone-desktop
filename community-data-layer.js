@@ -1005,6 +1005,30 @@
       return new Response(JSON.stringify(dashboard), { headers: { 'content-type': 'application/json' } });
     }
 
+    // GET /api/brain/knowledge/search?q=...
+    if (url.startsWith('/api/brain/knowledge/search') && method === 'GET') {
+      const params = new URL(url, 'http://localhost').searchParams;
+      const query = params.get('q') || '';
+      const limit = parseInt(params.get('limit') || '10');
+      const results = await window.electronAPI.brain.smartRetrieve(query, limit);
+      return new Response(JSON.stringify({ results }), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // GET /api/brain/knowledge/entities/:id/related
+    const entityRelatedMatch = url.match(/^\/api\/brain\/knowledge\/entities\/([^/]+)\/related$/);
+    if (entityRelatedMatch && method === 'GET') {
+      const depth = parseInt(new URL(url, 'http://localhost').searchParams.get('depth') || '2');
+      const related = await window.electronAPI.brain.getRelatedEntities(entityRelatedMatch[1], depth);
+      return new Response(JSON.stringify({ related }), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // POST /api/brain/knowledge/extract
+    if (url === '/api/brain/knowledge/extract' && method === 'POST') {
+      const body = init?.body ? JSON.parse(init.body) : {};
+      const entities = await window.electronAPI.brain.extractEntities(body.text || '');
+      return new Response(JSON.stringify({ entities }), { headers: { 'content-type': 'application/json' } });
+    }
+
     // ─── Folders ────────────────────────────────────────────────────────────
 
     // GET /api/chat/folders

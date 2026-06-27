@@ -127,6 +127,7 @@ function migrateIdentityTables(database) {
 async function buildSystemPrompt(userId = null, currentMessage = "", options = {}) {
   const database = db.getDb();
   const sections = [];
+  const { smartRetrieve } = require("./knowledge");
 
   // 1. Soul — core personality
   const soul = database.prepare("SELECT content FROM identity_soul WHERE id = ?").get("default");
@@ -182,8 +183,8 @@ async function buildSystemPrompt(userId = null, currentMessage = "", options = {
     }
   }
 
-  // 6. Relevant memories — ranked by importance + recency + relevance to current message
-  const memories = getRelevantMemories(database, currentMessage, 15);
+  // 6. Relevant memories — smart-ranked by recency, importance, entity matches
+  const memories = smartRetrieve(currentMessage, 15);
   if (memories.length > 0) {
     const memText = memories.map(m => `- [${m.category}] ${m.content} (importance: ${m.importance})`).join("\n");
     sections.push({ header: "Memories", content: memText, priority: IDENTITY_LAYERS.memories.priority });

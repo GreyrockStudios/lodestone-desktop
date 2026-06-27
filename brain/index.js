@@ -14,6 +14,7 @@ const db = require("../db");
 const { migrateIdentityTables, buildSystemPrompt, ...identityApi } = require("./identity");
 const memoryEngine = require("./memory-engine");
 const { agentLoop, executeTool, TOOL_DEFINITIONS } = require("./agent-loop");
+const knowledge = require("./knowledge");
 
 let initialized = false;
 
@@ -108,6 +109,8 @@ module.exports = {
   ...identityApi,
   // Memory
   ...memoryEngine,
+  // Knowledge
+  ...knowledge,
   // Agent
   agentLoop,
   executeTool,

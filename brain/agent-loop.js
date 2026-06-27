@@ -140,6 +140,18 @@ const TOOL_DEFINITIONS = [
       required: ["layer", "data"],
     },
   },
+  {
+    name: "knowledge_search",
+    description: "Search the knowledge graph for entities and their connections. Returns related memories and entities.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "What to search for" },
+        limit: { type: "number", description: "Max results (default 10)" },
+      },
+      required: ["query"],
+    },
+  },
 ];
 
 // ─── Tool Execution ──────────────────────────────────────────────────────────
@@ -263,6 +275,12 @@ async function executeTool(toolName, args, context = {}) {
         }
         default: return { success: false, error: `Unknown layer: ${args.layer}` };
       }
+    }
+
+    case "knowledge_search": {
+      const { smartRetrieve } = require("./knowledge");
+      const results = smartRetrieve(args.query || "", args.limit || 10);
+      return { success: true, data: results };
     }
 
     default:
