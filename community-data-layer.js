@@ -825,10 +825,56 @@
         const token = localStorage.getItem('lodestone_access_token');
         console.log('[Lodestone] Graph fetch — building locally from memories');
 
-        // Get local memories
-        const memories = await window.electronAPI.db.listMemories({ limit: 500 });
-        if (!memories || memories.length === 0) {
-          console.log('[Lodestone] No local memories for graph');
+        // Get local memories + identity data for a richer graph
+        const memories = await window.electronAPI.db.listMemories({ limit: 500 }) || [];
+        const identityNodes = [];
+        const extraEdges = [];
+
+        // Add identity data as graph nodes
+        try {
+          const soul = await window.electronAPI.brain?.getSoul?.();
+          if (soul?.content) {
+            const soulId = 'identity-soul';
+            identityNodes.push({ id: soulId, content: soul.content.substring(0, 80) + (soul.content.length > 80 ? '...' : ''), category: 'identity', importance: 1.0, created_at: soul.created_at || new Date().toISOString() });
+            // Link soul to all memories with 'identity' category
+            for (const m of memories) {
+              if (m.category === 'identity' || m.category === 'preference') {
+                extraEdges.push({ source: soulId, target: m.id, label: 'shapes', implicit: true, strength: 0.6 });
+              }
+            }
+          }
+          const identity = await window.electronAPI.brain?.getIdentity?.();
+          if (identity?.name || identity?.role) {
+            const idId = 'identity-profile';
+            identityNodes.push({ id: idId, content: `${identity.name || 'Unnamed'} — ${identity.role || 'Assistant'}`, category: 'identity', importance: 0.95, created_at: new Date().toISOString() });
+            if (soul?.content) extraEdges.push({ source: 'identity-soul', target: idId, label: 'embodies', implicit: true, strength: 0.8 });
+          }
+          const rules = await window.electronAPI.brain?.getRules?.() || [];
+          for (const rule of rules) {
+            const ruleId = `rule-${rule.id}`;
+            identityNodes.push({ id: ruleId, content: rule.rule, category: 'decision', importance: 0.85, created_at: rule.created_at || new Date().toISOString() });
+            if (soul?.content) extraEdges.push({ source: 'identity-soul', target: ruleId, label: 'rule', implicit: true, strength: 0.7 });
+          }
+          const heartbeat = await window.electronAPI.brain?.getHeartbeat?.();
+          if (heartbeat?.active_task) {
+            const hbId = 'heartbeat-active';
+            identityNodes.push({ id: hbId, content: `Active: ${heartbeat.active_task}`, category: 'event', importance: 0.9, created_at: new Date().toISOString() });
+            if (identity?.name) extraEdges.push({ source: 'identity-profile', target: hbId, label: 'working on', implicit: true, strength: 0.7 });
+          }
+          const profile = await window.electronAPI.brain?.getUserProfile?.();
+          if (profile?.name) {
+            const pId = 'user-profile';
+            identityNodes.push({ id: pId, content: `User: ${profile.name}`, category: 'entity', importance: 0.9, created_at: new Date().toISOString() });
+            if (identity?.name) extraEdges.push({ source: 'identity-profile', target: pId, label: 'serves', implicit: true, strength: 0.6 });
+          }
+        } catch (e) {
+          console.log('[Lodestone] Could not add identity nodes to graph:', e.message);
+        }
+
+        const allMemories = [...memories, ...identityNodes];
+
+        if (allMemories.length === 0) {
+          console.log('[Lodestone] No memories or identity data for graph');
           return new Response(JSON.stringify({ nodes: [], edges: [] }), {
             headers: { 'content-type': 'application/json' }
           });
@@ -850,17 +896,20 @@
           }
         }
 
+        // Add extra edges from identity connections
+        edges = [...edges, ...extraEdges];
+
         // If no server edges, auto-generate from shared keywords
         if (edges.length === 0) {
-          const memMap = new Map(memories.map(m => [m.id, m]));
+          const memMap = new Map(allMemories.map(m => [m.id, m]));
           const stopWords = new Set(['the','a','an','is','are','was','were','be','been','being','have','has','had','do','does','did','will','would','could','should','may','might','can','shall','must','need','i','me','my','we','our','you','your','he','him','his','she','her','it','its','they','them','their','this','that','these','those','what','which','who','whom','whose','when','where','why','how','all','each','every','both','few','more','most','other','some','such','no','not','only','own','same','so','than','too','very','just','because','but','and','or','if','then','else','while','for','in','on','at','to','from','by','with','about','between','through','during','before','after','above','below','up','down','out','off','over','under','again','further','once','also','of']);
           const keywords = (text) => {
             if (!text) return [];
             return text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 3 && !stopWords.has(w));
           };
-          for (let i = 0; i < memories.length; i++) {
-            for (let j = i + 1; j < memories.length; j++) {
-              const a = memories[i], b = memories[j];
+          for (let i = 0; i < allMemories.length; i++) {
+            for (let j = i + 1; j < allMemories.length; j++) {
+              const a = allMemories[i], b = allMemories[j];
               // Same category = related
               if (a.category === b.category) {
                 edges.push({ source: a.id, target: b.id, label: 'related', implicit: true, strength: 0.3 });
@@ -877,23 +926,23 @@
 
         // Compute force-directed layout positions
         const positions = new Map();
-        const cx = 400, cy = 200, radius = Math.min(150, 30 * memories.length);
-        memories.forEach((m, i) => {
+        const cx = 400, cy = 200, radius = Math.min(150, 30 * allMemories.length);
+        allMemories.forEach((m, i) => {
           const angle = (2 * Math.PI * i) / memories.length - Math.PI / 2;
           positions.set(m.id, { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) });
         });
         for (let iter = 0; iter < 50; iter++) {
-          const forces = new Map(memories.map(m => [m.id, { x: 0, y: 0 }]));
-          for (let i = 0; i < memories.length; i++) {
-            for (let j = i + 1; j < memories.length; j++) {
-              const a = positions.get(memories[i].id), b = positions.get(memories[j].id);
+          const forces = new Map(allMemories.map(m => [m.id, { x: 0, y: 0 }]));
+          for (let i = 0; i < allMemories.length; i++) {
+            for (let j = i + 1; j < allMemories.length; j++) {
+              const a = positions.get(allMemories[i].id), b = positions.get(allMemories[j].id);
               let dx = a.x - b.x, dy = a.y - b.y;
               const dist = Math.sqrt(dx * dx + dy * dy) || 1;
               const force = 5000 / (dist * dist);
-              forces.get(memories[i].id).x += (dx / dist) * force;
-              forces.get(memories[i].id).y += (dy / dist) * force;
-              forces.get(memories[j].id).x -= (dx / dist) * force;
-              forces.get(memories[j].id).y -= (dy / dist) * force;
+              forces.get(allMemories[i].id).x += (dx / dist) * force;
+              forces.get(allMemories[i].id).y += (dy / dist) * force;
+              forces.get(allMemories[j].id).x -= (dx / dist) * force;
+              forces.get(allMemories[j].id).y -= (dy / dist) * force;
             }
           }
           edges.forEach(e => {
@@ -908,7 +957,7 @@
             forces.get(e.target).y -= (dy / dist) * force;
           });
           const damping = 0.1;
-          memories.forEach(m => {
+          allMemories.forEach(m => {
             const f = forces.get(m.id), p = positions.get(m.id);
             p.x += f.x * damping;
             p.y += f.y * damping;
@@ -918,7 +967,7 @@
         const categoryToType = { entity: 'entity', fact: 'fact', preference: 'identity', decision: 'decision', event: 'event', concept: 'concept', commitment: 'event', note: 'fact' };
         const typeIcons = { identity: '\U0001f52e', entity: '\U0001f464', concept: '\U0001f4a1', event: '\U0001f4c5', fact: '\U0001f4cc' };
 
-        const nodes = memories.map(m => ({
+        const nodes = allMemories.map(m => ({
           id: m.id,
           label: (m.content || '').length > 40 ? (m.content || '').substring(0, 37) + '...' : (m.content || ''),
           fullContent: m.content,
