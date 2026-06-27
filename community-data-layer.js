@@ -968,6 +968,131 @@
       });
     }
 
+    // ─── Chat helpers (Community fallback) ──────────────────────────────────
+
+    // GET /api/chat/greeting — generate locally for Community tier
+    if (url === '/api/chat/greeting' && method === 'GET') {
+      try {
+        const memories = await window.electronAPI.db.listMemories({ limit: 50 });
+        const identity = await window.electronAPI.brain?.getIdentity?.() || {};
+        const hour = new Date().getHours();
+        const timeGreeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+        const name = identity?.name || 'friend';
+        const context = { recentTopics: memories?.slice(0, 5).map((m: any) => m.content?.split(' ').slice(0, 4).join(' ')).filter(Boolean) || [] };
+        const suggestions = [
+          { icon: '💡', label: 'Explain a concept', prompt: 'Explain ' },
+          { icon: '🔍', label: 'Search the web', prompt: 'Search for ' },
+          { icon: '🧠', label: 'Brainstorm ideas', prompt: 'Brainstorm ideas for ' },
+          { icon: '⏰', label: 'Set a reminder', prompt: 'Remind me to ' },
+        ];
+        return new Response(JSON.stringify({
+          greeting: `${timeGreeting}, ${name}!`,
+          agentName: identity?.name || 'Lodestone',
+          context,
+          suggestions
+        }), { headers: { 'content-type': 'application/json' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ greeting: 'Hello!', agentName: 'Lodestone', context: {}, suggestions: [] }), { headers: { 'content-type': 'application/json' } });
+      }
+    }
+
+    // GET /api/chat/system-prompts — return empty for Community
+    if (url === '/api/chat/system-prompts' && method === 'GET') {
+      return new Response(JSON.stringify({ prompts: [] }), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // GET /api/chat/templates — return empty for Community
+    if (url === '/api/chat/templates' && method === 'GET') {
+      return new Response(JSON.stringify({ templates: [] }), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // GET /api/chat/recall — search local memories
+    if (url.startsWith('/api/chat/recall') && method === 'GET') {
+      const params = new URL(url, 'http://localhost').searchParams;
+      const q = params.get('q') || '';
+      const limit = parseInt(params.get('limit') || '10');
+      try {
+        const all = await window.electronAPI.db.listMemories({ limit: 200 });
+        const qLower = q.toLowerCase();
+        const results = (all || []).filter((m: any) => m.content?.toLowerCase().includes(qLower)).slice(0, limit);
+        return new Response(JSON.stringify({ memories: results, total: results.length }), { headers: { 'content-type': 'application/json' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ memories: [], total: 0 }), { headers: { 'content-type': 'application/json' } });
+      }
+    }
+
+    // GET /api/identity — return brain identity for Community
+    if (url === '/api/identity' && method === 'GET') {
+      try {
+        const identity = await window.electronAPI.brain?.getIdentity?.() || {};
+        const soul = await window.electronAPI.brain?.getSoul?.() || {};
+        return new Response(JSON.stringify({
+          name: identity?.name || '',
+          avatar_emoji: identity?.avatar_emoji || '🪨',
+          profession: identity?.role || '',
+          personality: soul?.content || identity?.description || '',
+          tone: identity?.tone || 'balanced',
+          custom_instructions: identity?.custom_instructions || '',
+        }), { headers: { 'content-type': 'application/json' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ name: '', avatar_emoji: '🪨', profession: '', personality: '', tone: 'balanced', custom_instructions: '' }), { headers: { 'content-type': 'application/json' } });
+      }
+    }
+
+    // PUT /api/identity — update brain identity for Community
+    if (url === '/api/identity' && method === 'PUT') {
+      try {
+        const body = await request.json();
+        await window.electronAPI.brain?.setIdentity?.({
+          name: body.name,
+          role: body.profession,
+          description: body.personality,
+          tone: body.tone,
+          custom_instructions: body.custom_instructions,
+          avatar_emoji: body.avatar_emoji,
+        });
+        syncToServer('/api/identity', 'PUT', body);
+        return new Response(JSON.stringify({ success: true }), { headers: { 'content-type': 'application/json' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: 'Failed to update identity' }), { status: 500, headers: { 'content-type': 'application/json' } });
+      }
+    }
+
+    // GET /api/user/me/preferences — return empty for Community
+    if (url === '/api/user/me/preferences' && method === 'GET') {
+      return new Response(JSON.stringify({ preferences: {} }), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // GET /api/keys — return empty for Community (keys stored locally)
+    if (url === '/api/keys' && method === 'GET') {
+      return new Response(JSON.stringify({ keys: [] }), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // GET /api/usage/credits — return community tier credits
+    if (url === '/api/usage/credits' && method === 'GET') {
+      return new Response(JSON.stringify({ creditsUsed: 0, creditsRemaining: -1, monthlyCredits: -1 }), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // GET /api/usage/tokens — return community tier
+    if (url === '/api/usage/tokens' && method === 'GET') {
+      return new Response(JSON.stringify({ creditsUsed: 0, creditsRemaining: -1, monthlyCredits: -1 }), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // GET /api/usage/provider-rates — return default rates
+    if (url === '/api/usage/provider-rates' && method === 'GET') {
+      return new Response(JSON.stringify({ providers: [{ provider: 'ollama', inputPer1M: 0.084, outputPer1M: 0.084, isDefault: true }] }), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // GET /api/storage/usage — return local storage stats
+    if (url === '/api/storage/usage' && method === 'GET') {
+      try {
+        const stats = await window.electronAPI.db?.getStats?.();
+        return new Response(JSON.stringify({ used: stats?.totalSize || 0, limit: 1073741824, breakdown: { conversations: stats?.conversationsSize || 0, memories: stats?.memoriesSize || 0, files: stats?.filesSize || 0 } }), { headers: { 'content-type': 'application/json' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ used: 0, limit: 1073741824, breakdown: { conversations: 0, memories: 0, files: 0 } }), { headers: { 'content-type': 'application/json' } });
+      }
+    }
+
     // ─── Commitments ───────────────────────────────────────────────────────
 
     // GET /api/chat/commitments
