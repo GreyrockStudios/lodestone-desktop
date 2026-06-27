@@ -422,11 +422,62 @@
     }
   }
 
+  // ─── Brain: Inject identity system prompt ─────────────────────────────────
+  // Before sending messages to Ollama, prepend the brain's layered system prompt.
+  // This mirrors OpenClaw's startup context injection: SOUL → IDENTITY → RULES → HEARTBEAT → USER → MEMORIES.
+
+  async function injectBrainSystemPrompt(messages, userMessage) {
+    try {
+      if (!window.electronAPI?.brain?.buildSystemPrompt) return messages;
+      const systemPrompt = await window.electronAPI.brain.buildSystemPrompt(userMessage || '');
+      if (!systemPrompt || systemPrompt.trim().length < 10) return messages;
+      // Replace existing system message or prepend
+      const existingSystemIdx = messages.findIndex(m => m.role === 'system');
+      if (existingSystemIdx >= 0) {
+        // Merge: brain prompt goes first, then original system prompt
+        const merged = systemPrompt + '\n\n' + messages[existingSystemIdx].content;
+        return messages.map((m, i) => i === existingSystemIdx ? { ...m, content: merged } : m);
+      } else {
+        return [{ role: 'system', content: systemPrompt }, ...messages];
+      }
+    } catch (err) {
+      console.warn('[Brain] System prompt injection failed:', err);
+      return messages;
+    }
+  }
+
+  // ─── Brain: Extract memories after conversation turn ────────────────────────
+  // Fast regex extraction runs instantly. Deep LLM extraction runs in background.
+
+  async function extractBrainMemories(userMessage, assistantMessage, conversationId) {
+    try {
+      if (!window.electronAPI?.brain?.extractMemories) return;
+      // Extract from both messages
+      const userExtracted = await window.electronAPI.brain.extractMemories(userMessage);
+      const assistantExtracted = await window.electronAPI.brain.extractMemories(assistantMessage);
+      const allExtracted = [...(userExtracted || []), ...(assistantExtracted || [])];
+      if (allExtracted.length > 0) {
+        await window.electronAPI.brain.ingestMemories(allExtracted);
+        console.log(`[Brain] Extracted ${allExtracted.length} memories from conversation turn`);
+      }
+      // Deep extraction runs in background (non-blocking, uses cheap model)
+      if (window.electronAPI?.brain?.deepExtract) {
+        window.electronAPI.brain.deepExtract(
+          [{ role: 'user', content: userMessage }, { role: 'assistant', content: assistantMessage }],
+          null // apiKey not needed for local extraction
+        ).catch(err => console.warn('[Brain] Deep extraction failed:', err));
+      }
+    } catch (err) {
+      console.warn('[Brain] Memory extraction failed:', err);
+    }
+  }
+
   // ─── SSE-compatible Ollama stream ─────────────────────────────────────────
   // The SPA expects Server-Sent Events from /api/chat/stream.
   // We intercept and convert Ollama's streaming JSON into SSE format.
+  // Now with brain: system prompt injection + memory extraction.
 
-  function createOllamaStream(messages, model) {
+  async function createOllamaStream(messages, model) {
     const encoder = new TextEncoder();
     const ollamaUrl = getOllamaUrl();
     const ollamaModel = model || getOllamaModel();
@@ -434,12 +485,16 @@
     return new ReadableStream({
       async start(controller) {
         try {
+          // Inject brain system prompt before sending to LLM
+          const userMessage = messages.filter(m => m.role === 'user').pop()?.content || '';
+          const enrichedMessages = await injectBrainSystemPrompt(messages, userMessage);
+
           const res = await originalFetch(`${ollamaUrl}/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               model: ollamaModel,
-              messages: messages,
+              messages: enrichedMessages,
               stream: true,
             }),
           });
@@ -508,6 +563,9 @@
                         tokens_used: parsed.eval_count || null,
                       });
                       window.dispatchEvent(new CustomEvent('conversations-changed'));
+
+                      // Brain: Extract memories from this conversation turn
+                      extractBrainMemories(userMessage, fullContent, conv.id);
                     } catch (dbErr) {
                       console.warn('[Lodestone] Failed to save chat to local DB:', dbErr);
                     }
@@ -639,6 +697,13 @@
         tokens_used: body.tokens_used,
       });
       syncToServer(`/api/chat/conversations/${messagesMatch[1]}/messages`, 'POST', msg);
+
+      // Brain: Extract memories from assistant messages
+      if (body.role === 'assistant' && body.content) {
+        // We don't have the user message here, but we can extract from the assistant response
+        extractBrainMemories('', body.content, messagesMatch[1]);
+      }
+
       return new Response(JSON.stringify(msg), {
         headers: { 'content-type': 'application/json' }
       });
@@ -862,6 +927,82 @@
       return new Response(JSON.stringify({ success: true }), {
         headers: { 'content-type': 'application/json' }
       });
+    }
+
+    // ─── Brain (Local Agent Intelligence) ──────────────────────────────────
+    // All brain endpoints are local-first — no server sync needed.
+    // Identity, memory engine, commitment tracking, heartbeat.
+
+    // GET /api/brain/soul
+    if (url === '/api/brain/soul' && method === 'GET') {
+      const soul = await window.electronAPI.brain.getSoul();
+      return new Response(JSON.stringify(soul || { content: '' }), { headers: { 'content-type': 'application/json' } });
+    }
+    // PUT /api/brain/soul
+    if (url === '/api/brain/soul' && method === 'PUT') {
+      const body = init?.body ? JSON.parse(init.body) : {};
+      const soul = await window.electronAPI.brain.setSoul(body.content);
+      return new Response(JSON.stringify(soul), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // GET /api/brain/identity
+    if (url === '/api/brain/identity' && method === 'GET') {
+      const identity = await window.electronAPI.brain.getIdentity();
+      return new Response(JSON.stringify(identity || {}), { headers: { 'content-type': 'application/json' } });
+    }
+    // PUT /api/brain/identity
+    if (url === '/api/brain/identity' && method === 'PUT') {
+      const body = init?.body ? JSON.parse(init.body) : {};
+      const identity = await window.electronAPI.brain.setIdentity(body);
+      return new Response(JSON.stringify(identity), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // GET /api/brain/rules
+    if (url === '/api/brain/rules' && method === 'GET') {
+      const rules = await window.electronAPI.brain.getRules();
+      return new Response(JSON.stringify({ rules }), { headers: { 'content-type': 'application/json' } });
+    }
+    // POST /api/brain/rules
+    if (url === '/api/brain/rules' && method === 'POST') {
+      const body = init?.body ? JSON.parse(init.body) : {};
+      const id = await window.electronAPI.brain.addRule(body.rule, body.category, body.priority);
+      return new Response(JSON.stringify({ id }), { headers: { 'content-type': 'application/json' } });
+    }
+    // DELETE /api/brain/rules/:id
+    const brainRuleMatch = url.match(/^\/api\/brain\/rules\/(\d+)$/);
+    if (brainRuleMatch && method === 'DELETE') {
+      await window.electronAPI.brain.removeRule(parseInt(brainRuleMatch[1]));
+      return new Response(JSON.stringify({ success: true }), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // GET /api/brain/heartbeat
+    if (url === '/api/brain/heartbeat' && method === 'GET') {
+      const heartbeat = await window.electronAPI.brain.getHeartbeat();
+      return new Response(JSON.stringify(heartbeat || {}), { headers: { 'content-type': 'application/json' } });
+    }
+    // PUT /api/brain/heartbeat
+    if (url === '/api/brain/heartbeat' && method === 'PUT') {
+      const body = init?.body ? JSON.parse(init.body) : {};
+      const heartbeat = await window.electronAPI.brain.setHeartbeat(body);
+      return new Response(JSON.stringify(heartbeat), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // GET /api/brain/user-profile
+    if (url === '/api/brain/user-profile' && method === 'GET') {
+      const profile = await window.electronAPI.brain.getUserProfile();
+      return new Response(JSON.stringify(profile || {}), { headers: { 'content-type': 'application/json' } });
+    }
+    // PUT /api/brain/user-profile
+    if (url === '/api/brain/user-profile' && method === 'PUT') {
+      const body = init?.body ? JSON.parse(init.body) : {};
+      const profile = await window.electronAPI.brain.setUserProfile(body);
+      return new Response(JSON.stringify(profile), { headers: { 'content-type': 'application/json' } });
+    }
+
+    // GET /api/brain/dashboard
+    if (url === '/api/brain/dashboard' && method === 'GET') {
+      const dashboard = await window.electronAPI.brain.heartbeat();
+      return new Response(JSON.stringify(dashboard), { headers: { 'content-type': 'application/json' } });
     }
 
     // ─── Folders ────────────────────────────────────────────────────────────

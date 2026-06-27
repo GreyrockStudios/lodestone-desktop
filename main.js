@@ -1,4 +1,4 @@
-// ─── Lodestone Desktop — Electron Main Process v0.1.4 ──────────────────────
+// ─── Lodestone Desktop — Electron Main Process v0.5.8 ──────────────────────
 // Application wrapper for heylodestone.com chat interface.
 // Uses protocol.handle with a custom 'lodestone://' scheme to inject desktop
 // detection into HTML responses before the SPA evaluates its JS.
@@ -12,7 +12,7 @@ const fs = require("fs");
 const https = require("https");
 const Store = require("electron-store");
 const { autoUpdater } = require("electron-updater");
-const db = require("./db");
+const brain = require("./brain");
 const desktopTools = require("./desktop-tools");
 const scheduler = require("./scheduler");
 const { initMCP, cleanupMCP, autoStartBundledServers } = require("./mcp-bridge");
@@ -462,6 +462,67 @@ ipcMain.handle("db:get-db-path", () => {
   return path.join(os.homedir(), ".lodestone", "local.db");
 });
 
+// ─── Brain IPC Handlers ──────────────────────────────────────────────────────
+// Local agent brain — identity, memory engine, agent loop.
+// These power the "Cursor for Life" experience: persistent identity,
+// memory compounding, and proactive intelligence.
+
+// Identity
+ipcMain.handle("brain:get-soul", () => brain.getSoul());
+ipcMain.handle("brain:set-soul", (_e, content) => brain.setSoul(content));
+ipcMain.handle("brain:get-identity", () => brain.getIdentity());
+ipcMain.handle("brain:set-identity", (_e, data) => brain.setIdentity(data));
+ipcMain.handle("brain:get-rules", () => brain.getRules());
+ipcMain.handle("brain:add-rule", (_e, rule, category, priority) => brain.addRule(rule, category, priority));
+ipcMain.handle("brain:remove-rule", (_e, id) => brain.removeRule(id));
+ipcMain.handle("brain:toggle-rule", (_e, id, enabled) => brain.toggleRule(id, enabled));
+ipcMain.handle("brain:get-heartbeat", () => brain.getHeartbeat());
+ipcMain.handle("brain:set-heartbeat", (_e, data) => brain.setHeartbeat(data));
+ipcMain.handle("brain:get-user-profile", () => brain.getUserProfile());
+ipcMain.handle("brain:set-user-profile", (_e, data) => brain.setUserProfile(data));
+
+// System prompt (built from identity layers)
+ipcMain.handle("brain:build-system-prompt", async (_e, currentMessage, options) => {
+  return brain.buildSystemPrompt(null, currentMessage || "", options || {});
+});
+
+// Memory engine
+ipcMain.handle("brain:extract-memories", (_e, message) => brain.extractFromMessage(message));
+ipcMain.handle("brain:ingest-memories", (_e, extracted) => brain.ingestMemories(extracted));
+ipcMain.handle("brain:deep-extract", async (_e, messages, apiKey) => brain.deepExtract(messages, null, apiKey));
+
+// Commitments
+ipcMain.handle("brain:get-overdue-commitments", () => brain.getOverdueCommitments());
+ipcMain.handle("brain:complete-commitment", (_e, id) => brain.completeCommitment(id));
+
+// Heartbeat (proactive intelligence)
+ipcMain.handle("brain:heartbeat", () => brain.heartbeat());
+
+// Agent loop (for local-first chat with tools)
+ipcMain.handle("brain:agent-loop", async (_e, params) => {
+  const { messages, userMessage, conversationId } = params;
+  // The LLM caller will be injected by the SPA's data layer
+  // For now, this returns the system prompt + tool definitions
+  // The actual loop runs in the renderer process
+  const systemPrompt = await brain.buildSystemPrompt(null, userMessage || "");
+  return {
+    systemPrompt,
+    tools: brain.TOOL_DEFINITIONS,
+    maxIterations: 5,
+  };
+});
+
+// Tool execution
+ipcMain.handle("brain:execute-tool", async (_e, toolName, args) => {
+  return brain.executeTool(toolName, args, {
+    getSystemInfo: () => mainWindow.webContents.executeJavaScript('window.electronAPI?.getSystemInfo?.() || null').catch(() => null),
+    readFile: (filePath) => mainWindow.webContents.executeJavaScript(`window.electronAPI?.readFile?.(${JSON.stringify(filePath)}) || null`).catch(() => null),
+    writeFile: (filePath, content) => mainWindow.webContents.executeJavaScript(`window.electronAPI?.saveFile?.(${JSON.stringify(content)}, ${JSON.stringify(filePath)})`).catch(() => null),
+    searchFiles: (dir, pattern) => mainWindow.webContents.executeJavaScript(`window.electronAPI?.tools?.searchFiles?.(${JSON.stringify(dir)}, ${JSON.stringify(pattern)}) || []`).catch(() => []),
+    conversationId: args?._conversationId,
+  });
+});
+
 // ─── Code Execution (sandboxed) ──────────────────────────────────────────────
 // Runs Python or JavaScript in a sandboxed child process.
 // Timeout enforced, output captured.
@@ -624,6 +685,7 @@ app.whenReady().then(() => {
   registerGlobalShortcut();
   desktopTools.registerToolHandlers(mainWindow, store);
   scheduler.initScheduler(mainWindow);
+  brain.init(); // Initialize local agent brain — identity, memory engine, agent loop
   // Initialize MCP bridge - exposes Lodestone tools via Model Context Protocol
   const mcpTools = desktopTools.getTools().map(t => ({
     name: t.name,

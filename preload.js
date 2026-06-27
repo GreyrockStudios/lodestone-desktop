@@ -155,6 +155,43 @@ const electronAPI = {
     resume: (id) => ipcRenderer.invoke("scheduler:resume", id),
     nextRun: (cronExpr) => ipcRenderer.invoke("scheduler:next-run", cronExpr),
   },
+  // Brain (local agent intelligence)
+  brain: {
+    // Identity layers
+    getSoul: () => ipcRenderer.invoke('brain:get-soul'),
+    setSoul: (content) => ipcRenderer.invoke('brain:set-soul', content),
+    getIdentity: () => ipcRenderer.invoke('brain:get-identity'),
+    setIdentity: (data) => ipcRenderer.invoke('brain:set-identity', data),
+    getRules: () => ipcRenderer.invoke('brain:get-rules'),
+    addRule: (rule, category, priority) => ipcRenderer.invoke('brain:add-rule', rule, category, priority),
+    removeRule: (id) => ipcRenderer.invoke('brain:remove-rule', id),
+    toggleRule: (id, enabled) => ipcRenderer.invoke('brain:toggle-rule', id, enabled),
+    getHeartbeat: () => ipcRenderer.invoke('brain:get-heartbeat'),
+    setHeartbeat: (data) => ipcRenderer.invoke('brain:set-heartbeat', data),
+    getUserProfile: () => ipcRenderer.invoke('brain:get-user-profile'),
+    setUserProfile: (data) => ipcRenderer.invoke('brain:set-user-profile', data),
+
+    // System prompt
+    buildSystemPrompt: (currentMessage, options) => ipcRenderer.invoke('brain:build-system-prompt', currentMessage, options),
+
+    // Memory engine
+    extractMemories: (message) => ipcRenderer.invoke('brain:extract-memories', message),
+    ingestMemories: (extracted) => ipcRenderer.invoke('brain:ingest-memories', extracted),
+    deepExtract: (messages, apiKey) => ipcRenderer.invoke('brain:deep-extract', messages, apiKey),
+
+    // Commitments
+    getOverdueCommitments: () => ipcRenderer.invoke('brain:get-overdue-commitments'),
+    completeCommitment: (id) => ipcRenderer.invoke('brain:complete-commitment', id),
+
+    // Heartbeat
+    heartbeat: () => ipcRenderer.invoke('brain:heartbeat'),
+
+    // Agent loop
+    agentLoop: (params) => ipcRenderer.invoke('brain:agent-loop', params),
+    executeTool: (toolName, args) => ipcRenderer.invoke('brain:execute-tool', toolName, args),
+  },
+
+  // MCP
   mcp: {
     connect: (name, command, args, env) => ipcRenderer.invoke("mcp:connect", name, command, args, env),
     disconnect: (name) => ipcRenderer.invoke("mcp:disconnect", name),
