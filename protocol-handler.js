@@ -59,9 +59,9 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
     const queryIdx = urlPath.indexOf("?");
     if (queryIdx !== -1) urlPath = urlPath.substring(0, queryIdx);
 
-    // ─── API requests: proxy to server ───
+    // ─── API requests: proxy to api.heylodestone.com ───
     if (urlPath.startsWith("/api/")) {
-      let realUrl = request.url.replace("lodestone://app.", "https://");
+      let realUrl = request.url.replace("lodestone://app.heylodestone.com", "https://api.heylodestone.com");
       const hIdx = realUrl.indexOf("#");
       if (hIdx !== -1) realUrl = realUrl.substring(0, hIdx);
 
@@ -139,7 +139,7 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
       }
     }
 
-    // ─── Network fallback: fetch from heylodestone.com ───
+    // ─── Network fallback: fetch from heylodestone.com (marketing site) ───
     let realUrl = request.url.replace("lodestone://app.", "https://");
     const rHashIdx = realUrl.indexOf("#");
     if (rHashIdx !== -1) realUrl = realUrl.substring(0, rHashIdx);
