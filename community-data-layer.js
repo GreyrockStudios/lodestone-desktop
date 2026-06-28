@@ -1899,10 +1899,12 @@ function LodestoneTools(ctx) {
 function LodestoneFetchOverride(ctx) {
 
   async function handleFetch(input, init) {
+    try {
     if (!window.electronAPI?.db) return ctx.originalFetch.call(this, input, init);
 
     const url = typeof input === 'string' ? input : input instanceof Request ? input.url : '';
     const method = (init?.method || (typeof input === 'object' && input.method) || 'GET').toUpperCase();
+    console.log('[Lodestone] handleFetch:', method, url, 'body:', init?.body ? String(init.body).substring(0, 100) : 'none');
 
     // ─── Chat Streaming ──────────────────────────────────────────────────
     // POST /api/chat/stream → route to Ollama for local-first LLM
@@ -2216,6 +2218,9 @@ function LodestoneFetchOverride(ctx) {
       return response;
     }
     return response;
+  } catch (err) {
+    console.error('[Lodestone] handleFetch error:', err.message, err.stack);
+    return ctx.originalFetch.call(this, input, init);
   }
 
   return handleFetch;

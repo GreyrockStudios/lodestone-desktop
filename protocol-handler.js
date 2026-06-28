@@ -92,8 +92,10 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
 
       if (isSSERequest) {
         try {
-          console.log("[Lodestone] SSE proxy →", request.method, realUrl);
+          const logLine = `[${new Date().toISOString()}] SSE proxy → ${request.method} ${realUrl} body=${body ? body.substring(0, 100) : 'null'}\n`;
+          fs.appendFileSync('/tmp/lodestone-proxy.log', logLine);
           const { status, headers, stream } = await fetchWithNodeStreaming(realUrl, request.method, body, reqHeaders);
+          fs.appendFileSync('/tmp/lodestone-proxy.log', `[${new Date().toISOString()}] SSE response: status=${status} contentType=${headers['content-type'] || 'none'}\n`);
 
           const responseHeaders = {};
           for (const [key, value] of Object.entries(headers)) {
@@ -107,6 +109,7 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
           const webStream = streamModule.Readable.toWeb(stream);
           return new Response(webStream, { status, headers: responseHeaders });
         } catch (e) {
+          fs.appendFileSync('/tmp/lodestone-proxy.log', `[${new Date().toISOString()}] SSE proxy error: ${e.message} ${e.stack}\n`);
           console.error("[Lodestone] SSE proxy error:", e.message, e.stack);
           return new Response(JSON.stringify({ error: e.message || "Network error", type: "SSE_PROXY_ERROR" }), {
             status: 502,
@@ -117,6 +120,7 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
 
       // ─── Non-streaming API requests: use buffered proxy ───
       try {
+        fs.appendFileSync('/tmp/lodestone-proxy.log', `[${new Date().toISOString()}] API proxy: ${request.method} ${urlPath}\n`);
         const res = await fetchWithNode(realUrl, request.method, body, reqHeaders);
         const headers = {};
         for (const [key, value] of Object.entries(res.headers)) {
