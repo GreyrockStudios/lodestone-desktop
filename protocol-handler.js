@@ -91,10 +91,13 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
           if (key.toLowerCase() !== "transfer-encoding") headers[key] = value;
         }
         headers["access-control-allow-origin"] = "*";
-        return new Response(res.body, { status: res.status, headers });
+        // For streaming responses (SSE), body is a ReadableStream — pass directly
+        // For buffered responses, body is a string — wrap in Response
+        const responseBody = res.body;
+        return new Response(responseBody, { status: res.status, headers });
       } catch (e) {
         console.error("[Lodestone] API proxy error:", e.message);
-        return new Response(JSON.stringify({ error: "Network error" }), {
+        return new Response(JSON.stringify({ error: e.message || "Network error" }), {
           status: 502,
           headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
         });
