@@ -2,12 +2,16 @@
 // Serves UI from bundled local files (ui/ directory).
 // Only /api/ requests are proxied to the server.
 // Falls back to network for missing local assets.
+//
+// NOTE: SSE streaming endpoints (/api/chat/stream, /api/notifications/stream,
+// /api/brain/stream) are NOT proxied here. The frontend uses the absolute
+// API URL directly for these, bypassing the protocol handler entirely.
+// This avoids buffering issues with Electron's protocol.handle for long-lived
+// streaming responses.
 
 const path = require("path");
 const fs = require("fs");
-const { Readable } = require("stream");
 
-const { Readable } = require("stream");
 const UI_DIR = path.join(__dirname, "ui");
 
 const MIME_TYPES = {
@@ -32,7 +36,7 @@ const MIME_TYPES = {
   ".wasm": "application/wasm",
 };
 
-function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_DETECT_SCRIPT, communityDataLayerLoader, communityDataLayerScript }) {
+function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, communityDataLayerLoader, communityDataLayerScript }) {
   // Pre-load and cache the local index.html with injected scripts
   let localIndexHtml = null;
   try {
@@ -61,6 +65,16 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
     const queryIdx = urlPath.indexOf("?");
     if (queryIdx !== -1) urlPath = urlPath.substring(0, queryIdx);
 
+    // ─── SSE streaming endpoints: redirect to absolute URL ───
+    // The frontend should use the absolute API URL directly for these.
+    // If a request still comes through the protocol handler, redirect it.
+    if (urlPath.startsWith("/api/chat/stream") || urlPath.startsWith("/api/notifications/stream") || urlPath.startsWith("/api/brain/stream")) {
+      console.log("[Lodestone] SSE request intercepted (frontend should use absolute URL):", urlPath);
+      // Return a redirect to the absolute API URL
+      const redirectUrl = request.url.replace("lodestone://app.heylodestone.com", "https://api.heylodestone.com");
+      return Response.redirect(redirectUrl, 307);
+    }
+
     // ─── API requests: proxy to api.heylodestone.com ───
     if (urlPath.startsWith("/api/")) {
       let realUrl = request.url.replace("lodestone://app.heylodestone.com", "https://api.heylodestone.com");
@@ -69,54 +83,24 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
 
       console.log("[Lodestone] API proxy:", request.method, urlPath);
 
-      // Collect request body (used by both paths)
-      let body = null;
-      if (request.method !== "GET" && request.method !== "HEAD" && request.body) {
-        const reader = request.body.getReader();
-        const chunks = [];
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          chunks.push(value);
-        }
-        body = chunks.map(c => new TextDecoder().decode(c)).join("");
-      }
-      const reqHeaders = {};
-      for (const [key, value] of request.headers.entries()) {
-        if (key.toLowerCase() !== "host" && key.toLowerCase() !== "origin" && key.toLowerCase() !== "referer") {
-          reqHeaders[key] = value;
-        }
-      }
-
-      // ─── SSE streaming endpoints: use streaming proxy ───
-      const isSSERequest = urlPath.startsWith("/api/chat/stream") || urlPath.startsWith("/api/notifications/stream") || urlPath.startsWith("/api/brain/stream");
-
-      if (isSSERequest) {
-        try {
-          console.log("[Lodestone] SSE proxy →", request.method, realUrl);
-          const { status, headers, stream } = await fetchWithNodeStreaming(realUrl, request.method, body, reqHeaders);
-          const responseHeaders = {};
-          for (const [key, value] of Object.entries(headers)) {
-            if (key.toLowerCase() !== "transfer-encoding") responseHeaders[key] = value;
-          }
-          responseHeaders["access-control-allow-origin"] = "*";
-          responseHeaders["cache-control"] = "no-cache";
-          responseHeaders["x-accel-buffering"] = "no";
-
-          // Convert Node.js Readable to web ReadableStream
-          const webStream = Readable.toWeb(stream);
-          return new Response(webStream, { status, headers: responseHeaders });
-        } catch (e) {
-          console.error("[Lodestone] SSE proxy error:", e.message, e.stack);
-          return new Response(JSON.stringify({ error: e.message || "Network error", type: "SSE_PROXY_ERROR" }), {
-            status: 502,
-            headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
-          });
-        }
-      }
-
-      // ─── Non-streaming API requests: use buffered proxy ───
       try {
+        let body = null;
+        if (request.method !== "GET" && request.method !== "HEAD" && request.body) {
+          const reader = request.body.getReader();
+          const chunks = [];
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+          }
+          body = chunks.map(c => new TextDecoder().decode(c)).join("");
+        }
+        const reqHeaders = {};
+        for (const [key, value] of request.headers.entries()) {
+          if (key.toLowerCase() !== "host" && key.toLowerCase() !== "origin" && key.toLowerCase() !== "referer") {
+            reqHeaders[key] = value;
+          }
+        }
         const res = await fetchWithNode(realUrl, request.method, body, reqHeaders);
         const headers = {};
         for (const [key, value] of Object.entries(res.headers)) {
