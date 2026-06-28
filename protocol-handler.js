@@ -5,6 +5,7 @@
 
 const path = require("path");
 const fs = require("fs");
+const { net } = require("electron");
 
 const UI_DIR = path.join(__dirname, "ui");
 
@@ -67,6 +68,66 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
 
       console.log("[Lodestone] API proxy:", request.method, urlPath);
 
+      // ─── SSE streaming endpoints: use net.fetch for proper streaming ───
+      const isSSERequest = urlPath.startsWith("/api/chat/stream") || urlPath.startsWith("/api/notifications/stream") || urlPath.startsWith("/api/brain/stream");
+
+      if (isSSERequest) {
+        try {
+          // Collect request body
+          let body = null;
+          if (request.method !== "GET" && request.method !== "HEAD" && request.body) {
+            const reader = request.body.getReader();
+            const chunks = [];
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              chunks.push(value);
+            }
+            body = chunks.map(c => new TextDecoder().decode(c)).join("");
+          }
+
+          const fetchOptions = {
+            method: request.method,
+            headers: {},
+          };
+          if (body) {
+            fetchOptions.body = body;
+            fetchOptions.headers["Content-Type"] = "application/json";
+          }
+          // Forward auth headers
+          for (const [key, value] of request.headers.entries()) {
+            if (key.toLowerCase() !== "host" && key.toLowerCase() !== "origin" && key.toLowerCase() !== "referer") {
+              fetchOptions.headers[key] = value;
+            }
+          }
+
+          console.log("[Lodestone] SSE proxy →", request.method, realUrl);
+          const upstreamResponse = await net.fetch(realUrl, fetchOptions);
+
+          // Stream the response through — net.fetch returns a proper web Response
+          // that supports streaming bodies natively
+          const responseHeaders = {};
+          for (const [key, value] of upstreamResponse.headers.entries()) {
+            if (key.toLowerCase() !== "transfer-encoding") responseHeaders[key] = value;
+          }
+          responseHeaders["access-control-allow-origin"] = "*";
+          responseHeaders["cache-control"] = "no-cache";
+          responseHeaders["x-accel-buffering"] = "no";
+
+          return new Response(upstreamResponse.body, {
+            status: upstreamResponse.status,
+            headers: responseHeaders,
+          });
+        } catch (e) {
+          console.error("[Lodestone] SSE proxy error:", e.message);
+          return new Response(JSON.stringify({ error: e.message || "Network error" }), {
+            status: 502,
+            headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
+          });
+        }
+      }
+
+      // ─── Non-streaming API requests: use fetchWithNode (buffered) ───
       try {
         let body = null;
         if (request.method !== "GET" && request.method !== "HEAD" && request.body) {
@@ -91,10 +152,7 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
           if (key.toLowerCase() !== "transfer-encoding") headers[key] = value;
         }
         headers["access-control-allow-origin"] = "*";
-        // For streaming responses (SSE), body is a ReadableStream — pass directly
-        // For buffered responses, body is a string — wrap in Response
-        const responseBody = res.body;
-        return new Response(responseBody, { status: res.status, headers });
+        return new Response(res.body, { status: res.status, headers });
       } catch (e) {
         console.error("[Lodestone] API proxy error:", e.message);
         return new Response(JSON.stringify({ error: e.message || "Network error" }), {
@@ -110,7 +168,6 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
     const hasFileExtension = parsedUrl.pathname.includes(".") && !parsedUrl.pathname.endsWith("/");
 
     // ─── HTML page requests: serve local index.html ───
-    // All non-API, non-asset paths serve index.html (SPA routing)
     if (!isAssetRequest && !hasFileExtension) {
       if (localIndexHtml) {
         console.log("[Lodestone] Serving local index.html for:", urlPath || "/");
@@ -119,7 +176,6 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
           headers: { "content-type": "text/html; charset=utf-8", "access-control-allow-origin": "*" },
         });
       }
-      // Fall through to network if local file not available
     }
 
     // ─── Static asset requests: serve from local ui/ directory ───
@@ -137,17 +193,15 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
           });
         }
       } catch (e) {
-        // File not found locally — fall through to network fetch
         console.log("[Lodestone] Local file not found, fetching from network:", parsedUrl.pathname);
       }
     }
 
-    // ─── Network fallback: fetch from heylodestone.com (marketing site) ───
+    // ─── Network fallback: fetch from heylodestone.com ───
     let realUrl = request.url.replace("lodestone://app.", "https://");
     const rHashIdx = realUrl.indexOf("#");
     if (rHashIdx !== -1) realUrl = realUrl.substring(0, rHashIdx);
 
-    // Normalize SPA paths for network requests too
     const netParsed = new URL(realUrl);
     if (!netParsed.pathname.startsWith("/api/") && !netParsed.pathname.startsWith("/assets/") && !netParsed.pathname.startsWith("/lodestone") && netParsed.pathname !== "/" && !netParsed.pathname.includes(".")) {
       realUrl = `https://${netParsed.hostname}/`;
@@ -177,7 +231,6 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
 
       if (res.contentType.includes("text/html")) {
         let html = res.body;
-        // Only inject scripts if we don't have a local HTML cached
         if (!localIndexHtml) {
           html = html.replace(/<head([^>]*)>/i, `<head$1><script>${DESKTOP_DETECT_SCRIPT}<\/script><script>${communityDataLayerLoader}<\/script>`);
         }
@@ -195,7 +248,6 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
       return new Response(res.body, { status: res.status, headers });
     } catch (e) {
       console.error("[Lodestone] Protocol error:", e.message || e);
-      // If we have local HTML and the network is down, serve it as offline fallback
       if (localIndexHtml) {
         console.log("[Lodestone] Network error, serving local HTML as offline fallback");
         return new Response(localIndexHtml, {
