@@ -8,6 +8,18 @@ VERSION="${1:-current}"
 
 echo "=== Lodestone Desktop Builder (Electron) ==="
 
+# ─── Notarization check ───
+if [[ -n "$APPLE_ID" && -n "$APPLE_APP_SPECIFIC_PASSWORD" ]]; then
+  echo "🍎 macOS notarization credentials found — builds will be notarized."
+  export APPLE_TEAM_ID="${APPLE_TEAM_ID:-T2YATNHTKN}"
+else
+  echo "⚠️  APPLE_ID and/or APPLE_APP_SPECIFIC_PASSWORD not set — skipping notarization."
+  echo "   Set these env vars to enable notarized builds:"
+  echo "   export APPLE_ID=<your Apple ID email>"
+  echo "   export APPLE_APP_SPECIFIC_PASSWORD=<app-specific password from appleid.apple.com>"
+  echo "   export APPLE_TEAM_ID=T2YATNHTKN"
+fi
+
 # Step 1: Pull the latest web frontend from the server
 echo "📦 Pulling latest web frontend..."
 mkdir -p ui

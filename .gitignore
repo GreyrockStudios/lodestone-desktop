@@ -7,3 +7,4 @@ ui/
 *.deb
 .DS_Store
 Thumbs.db
+.env

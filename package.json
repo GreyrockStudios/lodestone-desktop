@@ -1,6 +1,6 @@
 {
   "name": "lodestone",
-  "version": "0.5.9",
+  "version": "0.5.11",
   "description": "Lodestone \u2014 Your AI brain, always learning",
   "main": "main.js",
   "scripts": {
@@ -109,7 +109,8 @@
         }
       ],
       "minimumSystemVersion": "10.15",
-      "identity": "8A2CCFFDC7574EBDA389C957A1E4D90BF336915F"
+      "identity": "8A2CCFFDC7574EBDA389C957A1E4D90BF336915F",
+      "notarize": false
     },
     "dmg": {
       "contents": [
