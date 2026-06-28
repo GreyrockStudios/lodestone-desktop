@@ -88,11 +88,10 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
 
           const fetchOptions = {
             method: request.method,
-            headers: {},
+            headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
           };
           if (body) {
             fetchOptions.body = body;
-            fetchOptions.headers["Content-Type"] = "application/json";
           }
           // Forward auth headers
           for (const [key, value] of request.headers.entries()) {
@@ -101,8 +100,9 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
             }
           }
 
-          console.log("[Lodestone] SSE proxy →", request.method, realUrl);
+          console.log("[Lodestone] SSE proxy →", request.method, realUrl, "body:", body ? body.substring(0, 200) : "null");
           const upstreamResponse = await net.fetch(realUrl, fetchOptions);
+          console.log("[Lodestone] SSE response:", upstreamResponse.status, upstreamResponse.headers.get("content-type"));
 
           // Stream the response through — net.fetch returns a proper web Response
           // that supports streaming bodies natively
@@ -119,8 +119,8 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
             headers: responseHeaders,
           });
         } catch (e) {
-          console.error("[Lodestone] SSE proxy error:", e.message);
-          return new Response(JSON.stringify({ error: e.message || "Network error" }), {
+          console.error("[Lodestone] SSE proxy error:", e.message, e.stack);
+          return new Response(JSON.stringify({ error: e.message || "Network error", type: "SSE_PROXY_ERROR" }), {
             status: 502,
             headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
           });
