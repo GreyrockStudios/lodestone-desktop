@@ -5,8 +5,9 @@
 
 const path = require("path");
 const fs = require("fs");
-const { net } = require("electron");
+const { Readable } = require("stream");
 
+const { Readable } = require("stream");
 const UI_DIR = path.join(__dirname, "ui");
 
 const MIME_TYPES = {
@@ -31,7 +32,7 @@ const MIME_TYPES = {
   ".wasm": "application/wasm",
 };
 
-function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, communityDataLayerLoader, communityDataLayerScript }) {
+function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_DETECT_SCRIPT, communityDataLayerLoader, communityDataLayerScript }) {
   // Pre-load and cache the local index.html with injected scripts
   let localIndexHtml = null;
   try {
@@ -68,56 +69,43 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
 
       console.log("[Lodestone] API proxy:", request.method, urlPath);
 
-      // ─── SSE streaming endpoints: use net.fetch for proper streaming ───
+      // Collect request body (used by both paths)
+      let body = null;
+      if (request.method !== "GET" && request.method !== "HEAD" && request.body) {
+        const reader = request.body.getReader();
+        const chunks = [];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+        }
+        body = chunks.map(c => new TextDecoder().decode(c)).join("");
+      }
+      const reqHeaders = {};
+      for (const [key, value] of request.headers.entries()) {
+        if (key.toLowerCase() !== "host" && key.toLowerCase() !== "origin" && key.toLowerCase() !== "referer") {
+          reqHeaders[key] = value;
+        }
+      }
+
+      // ─── SSE streaming endpoints: use streaming proxy ───
       const isSSERequest = urlPath.startsWith("/api/chat/stream") || urlPath.startsWith("/api/notifications/stream") || urlPath.startsWith("/api/brain/stream");
 
       if (isSSERequest) {
         try {
-          // Collect request body
-          let body = null;
-          if (request.method !== "GET" && request.method !== "HEAD" && request.body) {
-            const reader = request.body.getReader();
-            const chunks = [];
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              chunks.push(value);
-            }
-            body = chunks.map(c => new TextDecoder().decode(c)).join("");
-          }
-
-          const fetchOptions = {
-            method: request.method,
-            headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
-          };
-          if (body) {
-            fetchOptions.body = body;
-          }
-          // Forward auth headers
-          for (const [key, value] of request.headers.entries()) {
-            if (key.toLowerCase() !== "host" && key.toLowerCase() !== "origin" && key.toLowerCase() !== "referer") {
-              fetchOptions.headers[key] = value;
-            }
-          }
-
-          console.log("[Lodestone] SSE proxy →", request.method, realUrl, "body:", body ? body.substring(0, 200) : "null");
-          const upstreamResponse = await net.fetch(realUrl, fetchOptions);
-          console.log("[Lodestone] SSE response:", upstreamResponse.status, upstreamResponse.headers.get("content-type"));
-
-          // Stream the response through — net.fetch returns a proper web Response
-          // that supports streaming bodies natively
+          console.log("[Lodestone] SSE proxy →", request.method, realUrl);
+          const { status, headers, stream } = await fetchWithNodeStreaming(realUrl, request.method, body, reqHeaders);
           const responseHeaders = {};
-          for (const [key, value] of upstreamResponse.headers.entries()) {
+          for (const [key, value] of Object.entries(headers)) {
             if (key.toLowerCase() !== "transfer-encoding") responseHeaders[key] = value;
           }
           responseHeaders["access-control-allow-origin"] = "*";
           responseHeaders["cache-control"] = "no-cache";
           responseHeaders["x-accel-buffering"] = "no";
 
-          return new Response(upstreamResponse.body, {
-            status: upstreamResponse.status,
-            headers: responseHeaders,
-          });
+          // Convert Node.js Readable to web ReadableStream
+          const webStream = Readable.toWeb(stream);
+          return new Response(webStream, { status, headers: responseHeaders });
         } catch (e) {
           console.error("[Lodestone] SSE proxy error:", e.message, e.stack);
           return new Response(JSON.stringify({ error: e.message || "Network error", type: "SSE_PROXY_ERROR" }), {
@@ -127,25 +115,8 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
         }
       }
 
-      // ─── Non-streaming API requests: use fetchWithNode (buffered) ───
+      // ─── Non-streaming API requests: use buffered proxy ───
       try {
-        let body = null;
-        if (request.method !== "GET" && request.method !== "HEAD" && request.body) {
-          const reader = request.body.getReader();
-          const chunks = [];
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            chunks.push(value);
-          }
-          body = chunks.map(c => new TextDecoder().decode(c)).join("");
-        }
-        const reqHeaders = {};
-        for (const [key, value] of request.headers.entries()) {
-          if (key.toLowerCase() !== "host" && key.toLowerCase() !== "origin" && key.toLowerCase() !== "referer") {
-            reqHeaders[key] = value;
-          }
-        }
         const res = await fetchWithNode(realUrl, request.method, body, reqHeaders);
         const headers = {};
         for (const [key, value] of Object.entries(res.headers)) {
