@@ -10,6 +10,7 @@ const {
 const path = require("path");
 const fs = require("fs");
 const https = require("https");
+const http = require("http");
 const Store = require("electron-store");
 const { autoUpdater } = require("electron-updater");
 const db = require("./db");
@@ -112,15 +113,16 @@ let isQuitting = false;
 function fetchWithNode(url, method = "GET", body = null, headers = {}) {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
+    const httpModule = urlObj.protocol === "https:" ? https : http;
     const options = {
       method,
       hostname: urlObj.hostname,
-      port: urlObj.port || 443,
+      port: urlObj.port || (urlObj.protocol === "https:" ? 443 : 80),
       path: urlObj.pathname + urlObj.search,
       headers: { ...headers, "User-Agent": "Lodestone-Desktop/1.0" },
     };
     if (body) options.headers["Content-Type"] = options.headers["Content-Type"] || "application/json";
-    const req = https.request(options, (res) => {
+    const req = httpModule.request(options, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         const redirectUrl = res.headers.location.startsWith("http") ? res.headers.location : new URL(res.headers.location, url).toString();
         return fetchWithNode(redirectUrl, method, body, headers).then(resolve).catch(reject);
@@ -133,6 +135,81 @@ function fetchWithNode(url, method = "GET", body = null, headers = {}) {
       });
       res.on("error", reject);
     });
+    if (body) req.write(typeof body === "string" ? body : JSON.stringify(body));
+    req.end();
+    req.on("error", reject);
+  });
+}
+
+// ─── Streaming fetch helper for SSE endpoints ──────────────────────────────────
+// Uses a manual ReadableStream with push-based chunk delivery.
+// Electron's net.fetch is broken for streaming in protocol.handle (bug #47097),
+// and Readable.toWeb() doesn't push chunks reliably in this context either.
+// The manual approach enqueues each Node 'data' chunk immediately into the
+// Web ReadableStream, ensuring real-time SSE delivery to the renderer.
+function fetchWithNodeStreaming(url, method = "GET", body = null, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const httpModule = urlObj.protocol === "https:" ? https : http;
+    const options = {
+      method,
+      hostname: urlObj.hostname,
+      port: urlObj.port || (urlObj.protocol === "https:" ? 443 : 80),
+      path: urlObj.pathname + urlObj.search,
+      headers: { ...headers, "User-Agent": "Lodestone-Desktop/1.0" },
+    };
+    if (body) options.headers["Content-Type"] = options.headers["Content-Type"] || "application/json";
+
+    const req = httpModule.request(options, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        const redirectUrl = res.headers.location.startsWith("http") ? res.headers.location : new URL(res.headers.location, url).toString();
+        return fetchWithNodeStreaming(redirectUrl, method, body, headers).then(resolve).catch(reject);
+      }
+
+      const responseHeaders = {};
+      for (const [key, value] of Object.entries(res.headers)) {
+        if (key.toLowerCase() !== "transfer-encoding") responseHeaders[key] = value;
+      }
+
+      // Manual ReadableStream: each 'data' event immediately enqueues a Uint8Array
+      let streamClosed = false;
+      const webStream = new ReadableStream({
+        start(controller) {
+          res.on("data", (chunk) => {
+            if (streamClosed) return;
+            try {
+              controller.enqueue(new Uint8Array(chunk));
+            } catch (e) {
+              streamClosed = true;
+            }
+          });
+          res.on("end", () => {
+            if (!streamClosed) {
+              streamClosed = true;
+              try { controller.close(); } catch (e) { /* already closed */ }
+            }
+          });
+          res.on("error", (err) => {
+            if (!streamClosed) {
+              streamClosed = true;
+              try { controller.error(err); } catch (e) { /* already closed */ }
+            }
+          });
+        },
+        cancel() {
+          streamClosed = true;
+          res.destroy();
+        },
+      });
+
+      resolve({
+        status: res.statusCode,
+        headers: responseHeaders,
+        stream: webStream,
+        contentType: (res.headers["content-type"] || ""),
+      });
+    });
+
     if (body) req.write(typeof body === "string" ? body : JSON.stringify(body));
     req.end();
     req.on("error", reject);
@@ -608,6 +685,7 @@ app.whenReady().then(() => {
   // Falls back to network for missing local assets.
   protocol.handle("lodestone", createProtocolHandler({
     fetchWithNode,
+    fetchWithNodeStreaming,
     DESKTOP_DETECT_SCRIPT,
     communityDataLayerLoader,
     communityDataLayerScript,

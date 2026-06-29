@@ -30,7 +30,7 @@ const MIME_TYPES = {
   ".wasm": "application/wasm",
 };
 
-function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, communityDataLayerLoader, communityDataLayerScript }) {
+function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_DETECT_SCRIPT, communityDataLayerLoader, communityDataLayerScript }) {
   // Pre-load and cache the local index.html with injected scripts
   let localIndexHtml = null;
   try {
@@ -59,13 +59,15 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
     const queryIdx = urlPath.indexOf("?");
     if (queryIdx !== -1) urlPath = urlPath.substring(0, queryIdx);
 
-    // ─── API requests: proxy to server ───
+    // ─── API requests: proxy to api.heylodestone.com ───
     if (urlPath.startsWith("/api/")) {
-      let realUrl = request.url.replace("lodestone://app.", "https://");
+      let realUrl = request.url.replace("lodestone://app.heylodestone.com", "https://api.heylodestone.com");
       const hIdx = realUrl.indexOf("#");
       if (hIdx !== -1) realUrl = realUrl.substring(0, hIdx);
 
-      console.log("[Lodestone] API proxy:", request.method, urlPath);
+      // SSE/streaming endpoints — must stream incrementally, not buffer
+      const isSSE = urlPath.includes("/stream") || urlPath.includes("/sse") || urlPath.includes("/events");
+      console.log("[Lodestone] API proxy:", request.method, urlPath, isSSE ? "(SSE/streaming)" : "(buffered)");
 
       try {
         let body = null;
@@ -85,13 +87,29 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
             reqHeaders[key] = value;
           }
         }
-        const res = await fetchWithNode(realUrl, request.method, body, reqHeaders);
-        const headers = {};
-        for (const [key, value] of Object.entries(res.headers)) {
-          if (key.toLowerCase() !== "transfer-encoding") headers[key] = value;
+
+        if (isSSE) {
+          // SSE/streaming: Use manual ReadableStream via Node https.
+          // Electron's net.fetch is broken for streaming in protocol.handle (bug #47097),
+          // and Readable.toWeb() doesn't push chunks reliably in this context either.
+          // Only the manual ReadableStream approach delivers real-time SSE to the renderer.
+          const res = await fetchWithNodeStreaming(realUrl, request.method, body, reqHeaders);
+          const headers = {};
+          for (const [key, value] of Object.entries(res.headers)) {
+            if (key.toLowerCase() !== "transfer-encoding") headers[key] = value;
+          }
+          headers["access-control-allow-origin"] = "*";
+          return new Response(res.stream, { status: res.status, headers });
+        } else {
+          // Buffered: regular API call
+          const res = await fetchWithNode(realUrl, request.method, body, reqHeaders);
+          const headers = {};
+          for (const [key, value] of Object.entries(res.headers)) {
+            if (key.toLowerCase() !== "transfer-encoding") headers[key] = value;
+          }
+          headers["access-control-allow-origin"] = "*";
+          return new Response(res.body, { status: res.status, headers });
         }
-        headers["access-control-allow-origin"] = "*";
-        return new Response(res.body, { status: res.status, headers });
       } catch (e) {
         console.error("[Lodestone] API proxy error:", e.message);
         return new Response(JSON.stringify({ error: "Network error" }), {
@@ -139,7 +157,7 @@ function createProtocolHandler({ fetchWithNode, DESKTOP_DETECT_SCRIPT, community
       }
     }
 
-    // ─── Network fallback: fetch from heylodestone.com ───
+    // ─── Network fallback: fetch from heylodestone.com (marketing site) ───
     let realUrl = request.url.replace("lodestone://app.", "https://");
     const rHashIdx = realUrl.indexOf("#");
     if (rHashIdx !== -1) realUrl = realUrl.substring(0, rHashIdx);
