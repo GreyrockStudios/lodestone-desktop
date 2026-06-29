@@ -214,7 +214,8 @@ jobs:
           if [ -n "$ZIP" ]; then
             ZIP_SHA=$(sha512sum "$ZIP" | awk '{print $1}')
             ZIP_SIZE=$(stat -c%s "$ZIP")
-            echo "  - url: Lodestone-${VERSION}-universal-mac.zip" >> latest-mac.yml
+            ZIP_NAME=$(basename "$ZIP")
+            echo "  - url: ${ZIP_NAME}" >> latest-mac.yml
             echo "    sha512: ${ZIP_SHA}" >> latest-mac.yml
             echo "    size: ${ZIP_SIZE}" >> latest-mac.yml
           fi
@@ -222,13 +223,15 @@ jobs:
           if [ -n "$DMG" ]; then
             DMG_SHA=$(sha512sum "$DMG" | awk '{print $1}')
             DMG_SIZE=$(stat -c%s "$DMG")
-            echo "  - url: Lodestone-${VERSION}-universal.dmg" >> latest-mac.yml
+            DMG_NAME=$(basename "$DMG")
+            echo "  - url: ${DMG_NAME}" >> latest-mac.yml
             echo "    sha512: ${DMG_SHA}" >> latest-mac.yml
             echo "    size: ${DMG_SIZE}" >> latest-mac.yml
           fi
 
           if [ -n "$ZIP" ]; then
-            echo "path: Lodestone-${VERSION}-universal-mac.zip" >> latest-mac.yml
+            ZIP_NAME=$(basename "$ZIP")
+            echo "path: ${ZIP_NAME}" >> latest-mac.yml
             echo "sha512: ${ZIP_SHA}" >> latest-mac.yml
             echo "releaseDate: '${DATE}'" >> latest-mac.yml
           fi
@@ -279,14 +282,18 @@ jobs:
             VERSION="${{ needs.version.outputs.version }}"
             cd /var/www/lodestone/updates
 
-            # Download from GitHub Release
-            curl -sL "https://github.com/GreyrockStudios/lodestone-desktop/releases/download/v${VERSION}/Lodestone-${VERSION}-universal.dmg" -O
-            curl -sL "https://github.com/GreyrockStudios/lodestone-desktop/releases/download/v${VERSION}/Lodestone-${VERSION}-universal-mac.zip" -O
-            curl -sL "https://github.com/GreyrockStudios/lodestone-desktop/releases/download/v${VERSION}/Lodestone-Setup-${VERSION}.exe" -O
+            # Download from GitHub Release (detect actual filenames)
+            DMG_URL=$(curl -sL "https://api.github.com/repos/GreyrockStudios/lodestone-desktop/releases/tags/v${VERSION}" | jq -r '.assets[] | select(.name | endswith(".dmg")) | .browser_download_url' | head -1)
+            ZIP_URL=$(curl -sL "https://api.github.com/repos/GreyrockStudios/lodestone-desktop/releases/tags/v${VERSION}" | jq -r '.assets[] | select(.name | endswith("-mac.zip")) | .browser_download_url' | head -1)
+            EXE_URL=$(curl -sL "https://api.github.com/repos/GreyrockStudios/lodestone-desktop/releases/tags/v${VERSION}" | jq -r '.assets[] | select(.name | endswith(".exe")) | .browser_download_url' | head -1)
+
+            [ -n "$DMG_URL" ] && curl -sL "$DMG_URL" -O
+            [ -n "$ZIP_URL" ] && curl -sL "$ZIP_URL" -O
+            [ -n "$EXE_URL" ] && curl -sL "$EXE_URL" -O
 
             # Also copy to downloads directory
-            cp Lodestone-${VERSION}-universal.dmg /var/www/lodestone/downloads/
-            cp Lodestone-Setup-${VERSION}.exe /var/www/lodestone/downloads/ 2>/dev/null || true
+            cp *.dmg /var/www/lodestone/downloads/ 2>/dev/null || true
+            cp *.exe /var/www/lodestone/downloads/ 2>/dev/null || true
 
       - name: Deploy manifests to server
         uses: appleboy/scp-action@v0.1.7
