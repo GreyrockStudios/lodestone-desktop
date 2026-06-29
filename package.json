@@ -49,15 +49,7 @@
       "mcp-bridge.js",
       "mcp-servers.json",
       "protocol-handler.js",
-      "ui/**/*",
-      {
-        "from": "node_modules/better-sqlite3",
-        "to": "node_modules/better-sqlite3",
-        "filter": [
-          "**/*",
-          "!build/Release/test_extension.node"
-        ]
-      }
+      "ui/**/*"
     ],
     "asarUnpack": [
       "node_modules/better-sqlite3/**/*"
@@ -79,13 +71,13 @@
         {
           "target": "dmg",
           "arch": [
-            "universal"
+            "arm64"
           ]
         },
         {
           "target": "zip",
           "arch": [
-            "universal"
+            "arm64"
           ]
         }
       ],
