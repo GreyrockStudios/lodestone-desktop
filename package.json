@@ -49,7 +49,15 @@
       "mcp-bridge.js",
       "mcp-servers.json",
       "protocol-handler.js",
-      "ui/**/*"
+      "ui/**/*",
+      {
+        "from": "node_modules/better-sqlite3",
+        "to": "node_modules/better-sqlite3",
+        "filter": [
+          "**/*",
+          "!build/Release/test_extension.node"
+        ]
+      }
     ],
     "asarUnpack": [
       "node_modules/better-sqlite3/**/*"
@@ -82,10 +90,7 @@
         }
       ],
       "minimumSystemVersion": "10.15",
-      "identity": "8A2CCFFDC7574EBDA389C957A1E4D90BF336915F",
-      "x64ArchFiles": [
-        "node_modules/better-sqlite3/build/Release/better_sqlite3.node"
-      ]
+      "identity": "8A2CCFFDC7574EBDA389C957A1E4D90BF336915F"
     },
     "dmg": {
       "contents": [
