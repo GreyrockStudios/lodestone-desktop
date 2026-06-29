@@ -112,7 +112,7 @@ jobs:
         run: npm ci
 
       - name: Build macOS (unsigned)
-        run: npx electron-builder --mac --universal
+        run: npx electron-builder --mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
