@@ -270,6 +270,8 @@ jobs:
             latest-mac.yml
             latest.yml
           generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Deploy to update server
         uses: appleboy/ssh-action@v1.0.3
