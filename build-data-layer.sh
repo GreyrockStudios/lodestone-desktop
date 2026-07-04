@@ -65,6 +65,12 @@ echo "$MODULES" | while IFS=: read -r module_name global_name; do
       -e "s/^module\.exports = function init[A-Za-z]*/function $global_name/" \
       -e "s/^module\.exports = {/const $global_name = {/" \
       "$module_file" >> "$OUTPUT"
+    # If this is the storage module, add a local alias `storage` pointing to it
+    # so other modules can reference it by its original name
+    if [ "$module_name" = "storage" ]; then
+      echo "" >> "$OUTPUT"
+      echo "const storage = LodestoneStorage;" >> "$OUTPUT"
+    fi
   fi
 done
 

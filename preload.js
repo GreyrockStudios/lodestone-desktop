@@ -63,10 +63,53 @@ const electronAPI = {
     listFolders: () => ipcRenderer.invoke("db:list-folders"),
     createFolder: (data) => ipcRenderer.invoke("db:create-folder", data),
     deleteFolder: (id) => ipcRenderer.invoke("db:delete-folder", id),
+
+    // Artifacts (canvas persistence)
+    listArtifacts: (conversationId) => ipcRenderer.invoke("db:list-artifacts", conversationId),
+    getArtifact: (id) => ipcRenderer.invoke("db:get-artifact", id),
+    createArtifact: (data) => ipcRenderer.invoke("db:create-artifact", data),
+    updateArtifact: (id, data) => ipcRenderer.invoke("db:update-artifact", id, data),
+    deleteArtifact: (id) => ipcRenderer.invoke("db:delete-artifact", id),
+    pinArtifact: (id, pinned) => ipcRenderer.invoke("db:pin-artifact", id, pinned),
+
     getStats: () => ipcRenderer.invoke("db:get-stats"),
     exportAll: () => ipcRenderer.invoke("db:export-all"),
     importAll: (data) => ipcRenderer.invoke("db:import-all", data),
     getDbPath: () => ipcRenderer.invoke("db:get-db-path"),
+  },
+
+  // ─── Generic Desktop Tool Executor ──────────────────────────────────────
+  // Used by Socket.IO to execute desktop tools when the server sends a desktop:tool-call
+  execute: async (toolName, args = {}) => {
+    const map = {
+      'desktop_screenshot': () => ipcRenderer.invoke('tool:screenshot', args?.question),
+      'desktop_screen_understand': () => ipcRenderer.invoke('tool:screenshot', args?.question),
+      'desktop_click': () => ipcRenderer.invoke('tool:click', args?.x, args?.y, args?.button, args?.doubleClick),
+      'desktop_type_text': () => ipcRenderer.invoke('tool:type-text', args?.text, args?.pressEnter),
+      'desktop_press_key': () => ipcRenderer.invoke('tool:press-key', args?.key, args?.modifiers),
+      'desktop_scroll': () => ipcRenderer.invoke('tool:scroll', args?.x, args?.y, args?.deltaX, args?.deltaY),
+      'desktop_move_mouse': () => ipcRenderer.invoke('tool:move-mouse', args?.x, args?.y),
+      'desktop_get_mouse_pos': () => ipcRenderer.invoke('tool:get-mouse-pos'),
+      'desktop_drag': () => ipcRenderer.invoke('tool:drag', args?.fromX, args?.fromY, args?.toX, args?.toY, args?.duration),
+      'desktop_clipboard_read': () => ipcRenderer.invoke('tool:clipboard-read'),
+      'desktop_clipboard_write': () => ipcRenderer.invoke('tool:clipboard-write', args?.text),
+      'desktop_system_info': () => ipcRenderer.invoke('tool:system-info'),
+      'desktop_battery_info': () => ipcRenderer.invoke('tool:battery-info'),
+      'desktop_wifi_info': () => ipcRenderer.invoke('tool:wifi-info'),
+      'desktop_volume': () => args?.level !== undefined ? ipcRenderer.invoke('tool:set-volume', args.level) : ipcRenderer.invoke('tool:get-volume'),
+      'desktop_open_url': () => ipcRenderer.invoke('tool:open-url', args?.url),
+      'desktop_browser_open': () => ipcRenderer.invoke('tool:open-url', args?.url),
+      'desktop_active_window': () => ipcRenderer.invoke('tool:active-window'),
+      'desktop_run_command': () => ipcRenderer.invoke('tool:run-command', args?.command, args?.timeout),
+      'desktop_list_directory': () => ipcRenderer.invoke('tool:list-directory', args?.path),
+      'desktop_read_file': () => ipcRenderer.invoke('tool:read-file', args?.path),
+      'desktop_write_file': () => ipcRenderer.invoke('tool:write-file', args?.path, args?.content),
+      'desktop_search_files': () => ipcRenderer.invoke('tool:search-files', args?.path, args?.pattern, args?.maxResults),
+      'desktop_schedule_notification': () => ipcRenderer.invoke('tool:schedule-notification', args),
+    }
+    const handler = map[toolName]
+    if (!handler) return { error: `Unknown desktop tool: ${toolName}` }
+    return await handler()
   },
 
   // ─── Code Execution (sandboxed) ──────────────────────────────────────────
@@ -108,6 +151,9 @@ const electronAPI = {
 
     // Process list
     listProcesses: () => ipcRenderer.invoke("tool:list-processes"),
+
+    // Active window info
+    activeWindow: () => ipcRenderer.invoke("tool:active-window"),
 
     // Run command (restricted allowlist)
     runCommand: (command, timeout) => ipcRenderer.invoke("tool:run-command", command, timeout),

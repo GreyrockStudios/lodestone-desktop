@@ -189,7 +189,7 @@ class MCPClient {
       const id = ++msgId
       pending.set(id, { resolve, reject })
       send({ jsonrpc: '2.0', id, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'Lodestone', version: '0.1.4' } } })
-      setTimeout(() => { pending.delete(id); reject(new Error('Initialize timeout')) }, 10000)
+      setTimeout(() => { pending.delete(id); reject(new Error('Initialize timeout')) }, 30000)
     })
 
     // Send initialized notification
@@ -200,7 +200,7 @@ class MCPClient {
       const id = ++msgId
       pending.set(id, { resolve, reject })
       send({ jsonrpc: '2.0', id, method: 'tools/list', params: {} })
-      setTimeout(() => { pending.delete(id); reject(new Error('Tools list timeout')) }, 10000)
+      setTimeout(() => { pending.delete(id); reject(new Error('Tools list timeout')) }, 15000)
     })
 
     tools.push(...(toolsResult?.tools || []))
@@ -285,13 +285,13 @@ async function autoStartBundledServers() {
     // Check if user has disabled auto-start for this server
     const userDisabled = settings.get(`mcpAutoStart.${server.id}`) === false
     if (!server.autoStart || userDisabled) {
-      console.log(`[MCP] Skipping auto-start for ${server.name} (autoStart=${server.autoStart}, disabled=${userDisabled})`)
+      console.debug(`[MCP] Skipping auto-start for ${server.name} (autoStart=${server.autoStart}, disabled=${userDisabled})`)
       continue
     }
 
     // Don't start if already connected
     if (mcpClient.connections.has(server.id)) {
-      console.log(`[MCP] ${server.name} already connected, skipping`)
+      console.debug(`[MCP] already connected, skipping`)
       continue
     }
 

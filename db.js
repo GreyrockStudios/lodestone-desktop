@@ -89,6 +89,18 @@ function migrate(db) {
     CREATE INDEX IF NOT EXISTS idx_conversations_folder ON conversations(folder_id);
     CREATE INDEX IF NOT EXISTS idx_conversations_updated ON conversations(updated_at DESC);
 
+    CREATE TABLE IF NOT EXISTS artifacts (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      title TEXT DEFAULT '',
+      code TEXT NOT NULL,
+      pinned INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      conversation_id TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_artifacts_conversation ON artifacts(conversation_id);
+
     -- FTS5 index for memory recall search
     CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(content, category, source_type, content='memories', content_rowid='rowid');
 
@@ -274,6 +286,52 @@ function getMemoryGraph() {
   return { nodes: memories, edges: [] };
 }
 
+// ─── Artifacts ────────────────────────────────────────────────────────────────
+
+function listArtifacts(conversationId) {
+  const d = getDb();
+  if (conversationId) return d.prepare("SELECT * FROM artifacts WHERE conversation_id = ? ORDER BY created_at DESC").all(conversationId);
+  return d.prepare("SELECT * FROM artifacts ORDER BY created_at DESC").all();
+}
+
+function getArtifact(id) {
+  return getDb().prepare("SELECT * FROM artifacts WHERE id = ?").get(id);
+}
+
+function createArtifact({ id, type, title, code, pinned, conversation_id }) {
+  const d = getDb();
+  const artId = id || crypto.randomUUID();
+  d.prepare("INSERT INTO artifacts (id, type, title, code, pinned, conversation_id) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(artId, type, title || '', code, pinned ? 1 : 0, conversation_id || null);
+  return d.prepare("SELECT * FROM artifacts WHERE id = ?").get(artId);
+}
+
+function updateArtifact(id, updates) {
+  const d = getDb();
+  const fields = [];
+  const values = [];
+  for (const [key, value] of Object.entries(updates)) {
+    if (["type", "title", "code", "pinned", "conversation_id"].includes(key)) {
+      fields.push(`${key} = ?`);
+      values.push(key === "pinned" ? (value ? 1 : 0) : value);
+    }
+  }
+  if (fields.length === 0) return getArtifact(id);
+  values.push(id);
+  d.prepare(`UPDATE artifacts SET ${fields.join(", ")}, updated_at = datetime('now') WHERE id = ?`).run(...values);
+  return getArtifact(id);
+}
+
+function deleteArtifact(id) {
+  return getDb().prepare("DELETE FROM artifacts WHERE id = ?").run(id);
+}
+
+function pinArtifact(id, pinned) {
+  const d = getDb();
+  d.prepare("UPDATE artifacts SET pinned = ?, updated_at = datetime('now') WHERE id = ?").run(pinned ? 1 : 0, id);
+  return getArtifact(id);
+}
+
 // ─── Stats ───────────────────────────────────────────────────────────────────
 
 function getStats() {
@@ -297,6 +355,7 @@ function exportAll() {
     commitments: d.prepare("SELECT * FROM commitments").all(),
     settings: d.prepare("SELECT * FROM settings").all(),
     folders: d.prepare("SELECT * FROM folders").all(),
+    artifacts: d.prepare("SELECT * FROM artifacts").all(),
   };
 }
 
@@ -308,6 +367,7 @@ function importAll(data) {
   const insertCom = d.prepare("INSERT OR REPLACE INTO commitments (id, content, due_date, status, created_at, completed_at, source_conversation_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
   const insertSet = d.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)");
   const insertFld = d.prepare("INSERT OR REPLACE INTO folders (id, name, parent_id, created_at) VALUES (?, ?, ?, ?)");
+  const insertArt = d.prepare("INSERT OR REPLACE INTO artifacts (id, type, title, code, pinned, created_at, updated_at, conversation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
 
   d.transaction(() => {
     for (const c of (data.conversations || [])) insertConv.run(c.id, c.title, c.model, c.provider, c.system_prompt, c.created_at, c.updated_at, c.folder_id, c.is_archived, c.message_count);
@@ -316,6 +376,7 @@ function importAll(data) {
     for (const c of (data.commitments || [])) insertCom.run(c.id, c.content, c.due_date, c.status, c.created_at, c.completed_at, c.source_conversation_id);
     for (const s of (data.settings || [])) insertSet.run(s.key, s.value);
     for (const f of (data.folders || [])) insertFld.run(f.id, f.name, f.parent_id, f.created_at);
+    for (const a of (data.artifacts || [])) insertArt.run(a.id, a.type, a.title, a.code, a.pinned, a.created_at, a.updated_at, a.conversation_id);
   })();
 }
 
@@ -331,6 +392,7 @@ module.exports = {
   listCommitments, createCommitment, updateCommitment, deleteCommitment,
   getSetting, setSetting,
   listFolders, createFolder, deleteFolder,
+  listArtifacts, getArtifact, createArtifact, updateArtifact, deleteArtifact, pinArtifact,
   getMemoryGraph, getStats,
   exportAll, importAll,
 };

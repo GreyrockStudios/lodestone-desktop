@@ -224,6 +224,171 @@ const LodestoneConfig = {
         },
       },
     },
+    // ─── Desktop Automation Tools ──────────────────────────────────────────
+    {
+      type: 'function',
+      function: {
+        name: 'desktop_click',
+        description: 'Click at screen coordinates on the user desktop. Use for UI automation like clicking buttons, links, or menu items.',
+        parameters: {
+          type: 'object',
+          properties: {
+            x: { type: 'number', description: 'X coordinate' },
+            y: { type: 'number', description: 'Y coordinate' },
+            button: { type: 'string', enum: ['left', 'right'], description: 'Mouse button' },
+            doubleClick: { type: 'boolean', description: 'Double-click' },
+          },
+          required: ['x', 'y'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'desktop_type_text',
+        description: 'Type text at the current cursor position on the user desktop. Use for filling in text fields, search boxes, or entering data.',
+        parameters: {
+          type: 'object',
+          properties: {
+            text: { type: 'string', description: 'Text to type' },
+            pressEnter: { type: 'boolean', description: 'Press Enter after typing' },
+          },
+          required: ['text'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'desktop_press_key',
+        description: 'Press a key or key combination on the user desktop. Use for keyboard shortcuts (e.g. Cmd+C, Alt+Tab, Escape).',
+        parameters: {
+          type: 'object',
+          properties: {
+            key: { type: 'string', description: 'Key to press (e.g. enter, tab, escape, a, f5)' },
+            modifiers: { type: 'array', items: { type: 'string', enum: ['cmd', 'ctrl', 'alt', 'shift'] }, description: 'Key modifiers' },
+          },
+          required: ['key'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'desktop_scroll',
+        description: 'Scroll at a position on the user desktop. Use to scroll through documents, web pages, or lists.',
+        parameters: {
+          type: 'object',
+          properties: {
+            x: { type: 'number', description: 'X coordinate' },
+            y: { type: 'number', description: 'Y coordinate' },
+            deltaY: { type: 'number', description: 'Scroll amount (negative = up, positive = down)' },
+          },
+          required: [],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'desktop_move_mouse',
+        description: 'Move the mouse to screen coordinates on the user desktop. Use for hover effects or positioning before a click.',
+        parameters: {
+          type: 'object',
+          properties: {
+            x: { type: 'number', description: 'X coordinate' },
+            y: { type: 'number', description: 'Y coordinate' },
+          },
+          required: ['x', 'y'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'desktop_get_mouse_pos',
+        description: 'Get the current mouse position on the user desktop. Use to determine where the cursor is before performing actions.',
+        parameters: {
+          type: 'object',
+          properties: {},
+          required: [],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'desktop_drag',
+        description: 'Drag from one point to another on the user desktop. Use for moving files, resizing windows, or drag-and-drop actions.',
+        parameters: {
+          type: 'object',
+          properties: {
+            fromX: { type: 'number', description: 'Start X coordinate' },
+            fromY: { type: 'number', description: 'Start Y coordinate' },
+            toX: { type: 'number', description: 'End X coordinate' },
+            toY: { type: 'number', description: 'End Y coordinate' },
+            duration: { type: 'number', description: 'Duration in milliseconds' },
+          },
+          required: ['fromX', 'fromY', 'toX', 'toY'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'desktop_active_window',
+        description: 'Get information about the currently active window on the user computer (app name, window title). Use this for context-aware assistance.',
+        parameters: {
+          type: 'object',
+          properties: {},
+          required: [],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'desktop_browser_open',
+        description: 'Open a URL in the user default browser. Use this to help the user navigate to web pages, open links, or launch web applications.',
+        parameters: {
+          type: 'object',
+          properties: {
+            url: { type: 'string', description: 'URL to open in the browser' },
+          },
+          required: ['url'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'desktop_screen_understand',
+        description: 'Take a screenshot and prepare it for vision analysis. The AI can see what is on your screen and answer questions about it.',
+        parameters: {
+          type: 'object',
+          properties: {
+            question: { type: 'string', description: 'What to ask about the screen content (default: describe what you see)' },
+          },
+          required: [],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'desktop_schedule_notification',
+        description: 'Schedule a desktop notification to appear at a specific time.',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Notification title' },
+            body: { type: 'string', description: 'Notification body text' },
+            delayMs: { type: 'number', description: 'Delay in milliseconds before showing' },
+          },
+          required: ['title', 'body'],
+        },
+      },
+    },
     // ─── Scheduler Tools ───────────────────────────────────────────────────
     {
       type: 'function',
@@ -358,13 +523,13 @@ const LodestoneStorage = {
     localStorage.setItem(LodestoneConfig.CLOUD_SYNC_KEY, String(enabled));
   },
   getOllamaUrl() {
-    return localStorage.getItem(LodestoneConfig.OLLAMA_URL_KEY) || LodestoneConfig.DEFAULT_OLLAMA_URL;
+    return localStorage.getItem(LodestoneConfig.OLLAMA_URL_KEY) || null;
   },
   setOllamaUrl(url) {
     localStorage.setItem(LodestoneConfig.OLLAMA_URL_KEY, url);
   },
   getOllamaModel() {
-    return localStorage.getItem(LodestoneConfig.LOCAL_MODEL_KEY) || LodestoneConfig.DEFAULT_OLLAMA_MODEL;
+    return localStorage.getItem(LodestoneConfig.LOCAL_MODEL_KEY) || null;
   },
   setOllamaModel(model) {
     localStorage.setItem(LodestoneConfig.LOCAL_MODEL_KEY, model);
@@ -382,6 +547,8 @@ const LodestoneStorage = {
     localStorage.setItem(LodestoneConfig.LAST_SYNC_KEY, iso);
   },
 };
+const storage = LodestoneStorage;
+
 // ─── Module: events ────────────────────────────────────────────────
 // ─── Event Helpers ─────────────────────────────────────────────────────────
 // Thin wrappers around window.dispatchEvent / CustomEvent for the data layer.
@@ -435,7 +602,7 @@ function LodestoneAuth(ctx) {
           return data.accessToken;
         }
       }
-      // Refresh failed — clear tokens to force re-login
+      // Refresh failed - clear tokens to force re-login
       storage.clearTokens();
       window.dispatchEvent(new CustomEvent('lodestone:token-expired'));
       return null;
@@ -459,7 +626,7 @@ function LodestoneAuth(ctx) {
       const refreshToken = storage.getRefreshToken();
       const accessToken = storage.getAccessToken();
       if (refreshToken && accessToken) {
-        console.log('[Lodestone] Proactive token refresh');
+        console.debug('[Lodestone] Proactive token refresh');
         getRefreshedToken();
       }
     }, LodestoneConfig.REFRESH_INTERVAL_MS);
@@ -488,19 +655,36 @@ function LodestoneAuth(ctx) {
     } catch (e) {
       ctx.currentTier = 'community';
     }
-    console.log('[Lodestone] Data layer: tier =', ctx.currentTier);
+    console.debug('[Lodestone] Data layer: tier =', ctx.currentTier);
     if (storage.isCloudSyncEnabled()) {
       ctx.sync.enableSync();
     }
   }
 
-  detectTier();
+    detectTier();
   window.addEventListener('storage', (e) => {
     if (e.key === LodestoneConfig.ACCESS_TOKEN_KEY) {
       detectTier();
     }
   });
-
+  // Re-detect tier when auth state changes (login/logout/token-refresh)
+  window.addEventListener('lodestone:auth-changed', () => {
+    detectTier();
+  });
+  window.addEventListener('lodestone:token-refreshed', () => {
+    detectTier();
+  });
+  // Fallback: check for token changes every 3 seconds (covers edge cases where events don't fire)
+  let _lastToken = storage.getAccessToken();
+  setInterval(() => {
+    const currentToken = storage.getAccessToken();
+    if (currentToken !== _lastToken) {
+      _lastToken = currentToken;
+      if (currentToken) detectTier();
+      else ctx.currentTier = null; // Logged out
+    }
+  }, 3000);
+  
   // 401 → refresh token → retry logic
   async function retryWithRefresh(input, init, originalFetch) {
     const refreshToken = storage.getRefreshToken();
@@ -509,7 +693,7 @@ function LodestoneAuth(ctx) {
       window.dispatchEvent(new CustomEvent('lodestone:token-expired'));
       return null; // signal that refresh failed
     }
-    console.log('[Lodestone] 401 detected, attempting token refresh');
+    console.debug('[Lodestone] 401 detected, attempting token refresh');
     const newToken = await getRefreshedToken();
     if (newToken) {
       const newInit = { ...init };
@@ -660,7 +844,7 @@ function LodestoneSync(ctx) {
       const now = new Date().toISOString();
       lastSyncAt = now;
       storage.setLastSyncAt(now);
-      console.log('[Lodestone] Pull sync complete. Pulled', pulled, 'records.');
+      console.debug('[Lodestone] Pull sync complete. Pulled', pulled, 'records.');
     } catch (e) {
       console.warn('[Lodestone] Pull sync failed:', e.message);
     } finally {
@@ -794,13 +978,13 @@ function LodestoneSync(ctx) {
               }
             }
           }
-          console.log('[Lodestone] Brain identity sync: pulled from server');
+          console.debug('[Lodestone] Brain identity sync: pulled from server');
         }
       } catch (e) {
         console.warn('[Lodestone] Failed to pull brain identity:', e.message);
       }
 
-      console.log('[Lodestone] Push sync complete. Pushed', pushed, 'records.');
+      console.debug('[Lodestone] Push sync complete. Pushed', pushed, 'records.');
     } catch (e) {
       console.warn('[Lodestone] Push sync failed:', e.message);
     }
@@ -810,7 +994,7 @@ function LodestoneSync(ctx) {
     if (ctx.currentTier === 'community') { ctx.syncEnabled = false; return; }
     ctx.syncEnabled = true;
     storage.setCloudSync(true);
-    console.log('[Lodestone] Cloud sync enabled for tier:', ctx.currentTier);
+    console.debug('[Lodestone] Cloud sync enabled for tier:', ctx.currentTier);
     await pullFromServer();
     await pushLocalOnly();
   }
@@ -818,7 +1002,7 @@ function LodestoneSync(ctx) {
   function disableSync() {
     ctx.syncEnabled = false;
     storage.setCloudSync(false);
-    console.log('[Lodestone] Cloud sync disabled');
+    console.debug('[Lodestone] Cloud sync disabled');
   }
 
   // Auto-sync every 5 minutes when sync is enabled
@@ -1220,7 +1404,7 @@ function LodestoneMemories(ctx) {
   async function buildGraph() {
     try {
       const token = storage.getAccessToken();
-      console.log('[Lodestone] Graph fetch — building locally from memories');
+      console.debug('[Lodestone] Graph fetch — building locally from memories');
 
       const memories = await window.electronAPI.db.listMemories({ limit: 500 }) || [];
       const identityNodes = [];
@@ -1263,13 +1447,13 @@ function LodestoneMemories(ctx) {
           if (identity?.name) extraEdges.push({ source: 'identity-profile', target: pId, label: 'serves', implicit: true, strength: 0.6 });
         }
       } catch (e) {
-        console.log('[Lodestone] Could not add identity nodes to graph:', e.message);
+        console.debug('[Lodestone] Could not add identity nodes to graph:', e.message);
       }
 
       const allMemories = [...memories, ...identityNodes];
 
       if (allMemories.length === 0) {
-        console.log('[Lodestone] No memories or identity data for graph');
+        console.debug('[Lodestone] No memories or identity data for graph');
         return new Response(JSON.stringify({ nodes: [], edges: [] }), {
           headers: { 'content-type': 'application/json' },
         });
@@ -1287,7 +1471,7 @@ function LodestoneMemories(ctx) {
             edges = edgeData.edges || edgeData || [];
           }
         } catch (e) {
-          console.log('[Lodestone] Could not fetch edges from server, generating locally');
+          console.debug('[Lodestone] Could not fetch edges from server, generating locally');
         }
       }
 
@@ -1377,7 +1561,7 @@ function LodestoneMemories(ctx) {
         implicit: e.implicit ?? (e.strength < 0.3),
       }));
 
-      console.log('[Lodestone] Graph built locally:', nodes.length, 'nodes,', formattedEdges.length, 'edges');
+      console.debug('[Lodestone] Graph built locally:', nodes.length, 'nodes,', formattedEdges.length, 'edges');
       return new Response(JSON.stringify({ nodes, edges: formattedEdges }), {
         headers: { 'content-type': 'application/json' },
       });
@@ -1844,6 +2028,67 @@ function LodestoneTools(ctx) {
           return JSON.stringify(result);
         }
 
+        // ── Desktop Automation Tools ──
+        case 'desktop_click': {
+          if (!window.electronAPI?.tools) return null;
+          const clickResult = await window.electronAPI.tools.click(args.x, args.y, args.button, args.doubleClick);
+          return JSON.stringify(clickResult);
+        }
+        case 'desktop_type_text': {
+          if (!window.electronAPI?.tools) return null;
+          const typeResult = await window.electronAPI.tools.typeText(args.text, args.pressEnter);
+          return JSON.stringify(typeResult);
+        }
+        case 'desktop_press_key': {
+          if (!window.electronAPI?.tools) return null;
+          const keyResult = await window.electronAPI.tools.pressKey(args.key, args.modifiers);
+          return JSON.stringify(keyResult);
+        }
+        case 'desktop_scroll': {
+          if (!window.electronAPI?.tools) return null;
+          const scrollResult = await window.electronAPI.tools.scroll(args.x, args.y, args.deltaX, args.deltaY);
+          return JSON.stringify(scrollResult);
+        }
+        case 'desktop_move_mouse': {
+          if (!window.electronAPI?.tools) return null;
+          const moveResult = await window.electronAPI.tools.moveMouse(args.x, args.y);
+          return JSON.stringify(moveResult);
+        }
+        case 'desktop_get_mouse_pos': {
+          if (!window.electronAPI?.tools) return null;
+          const posResult = await window.electronAPI.tools.getMousePos();
+          return JSON.stringify(posResult);
+        }
+        case 'desktop_drag': {
+          if (!window.electronAPI?.tools) return null;
+          const dragResult = await window.electronAPI.tools.drag(args.fromX, args.fromY, args.toX, args.toY, args.duration);
+          return JSON.stringify(dragResult);
+        }
+        case 'desktop_active_window': {
+          if (!window.electronAPI?.tools) return null;
+          const awResult = await window.electronAPI.tools.activeWindow();
+          return JSON.stringify(awResult);
+        }
+        case 'desktop_browser_open': {
+          if (!window.electronAPI?.tools) return null;
+          const boResult = await window.electronAPI.tools.openExternal(args.url);
+          return JSON.stringify(boResult);
+        }
+        case 'desktop_screen_understand': {
+          if (!window.electronAPI?.tools) return null;
+          const suResult = await window.electronAPI.tools.takeScreenshot();
+          return JSON.stringify({ ...suResult, question: args.question || 'Describe what you see' });
+        }
+        case 'desktop_schedule_notification': {
+          if (!window.electronAPI?.tools) return null;
+          const notifResult = await window.electronAPI.tools.scheduleNotification({
+            title: args.title,
+            body: args.body,
+            delayMs: args.delayMs,
+          });
+          return JSON.stringify(notifResult);
+        }
+
         // ── Scheduler ──
         case 'scheduler_create': {
           if (!window.electronAPI?.scheduler) return null;
@@ -1899,18 +2144,18 @@ function LodestoneTools(ctx) {
 function LodestoneFetchOverride(ctx) {
 
   async function handleFetch(input, init) {
-    try {
     if (!window.electronAPI?.db) return ctx.originalFetch.call(this, input, init);
 
     const url = typeof input === 'string' ? input : input instanceof Request ? input.url : '';
     const method = (init?.method || (typeof input === 'object' && input.method) || 'GET').toUpperCase();
-    console.log('[Lodestone] handleFetch:', method, url, 'body:', init?.body ? String(init.body).substring(0, 100) : 'none');
 
     // ─── Chat Streaming ──────────────────────────────────────────────────
-    // POST /api/chat/stream → route to Ollama for local-first LLM
+    // POST /api/chat/stream → route to Ollama only if user explicitly chose local
     if (url === '/api/chat/stream' && method === 'POST') {
       const body = init?.body ? JSON.parse(init.body) : {};
-      const useLocalLLM = !!localStorage.getItem(LodestoneConfig.OLLAMA_URL_KEY) || ctx.currentTier === 'community' || storage.isLocalProvider();
+      const hasToken = storage.getAccessToken() || localStorage.getItem('lodestone_access_token') || localStorage.getItem('lodest_access_token');
+      // Only use local LLM if user explicitly chose local provider OR is community tier without token
+      const useLocalLLM = !hasToken ? (ctx.currentTier === 'community') : storage.isLocalProvider();
 
       if (useLocalLLM) {
         try {
@@ -1924,6 +2169,90 @@ function LodestoneFetchOverride(ctx) {
           console.warn('[Lodestone] Local LLM failed, falling back to server:', err.message);
         }
       }
+
+      // For Pro/Studio users: intercept SSE stream to handle desktop tools locally
+      if (hasToken && window.electronAPI?.tools) {
+        const response = await ctx.originalFetch.call(this, input, init);
+        if (!response.ok || !response.body) return response;
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        const encoder = new TextEncoder();
+        let buffer = '';
+        let pendingDesktopTool = null; // { name, args, iteration }
+
+        const transformStream = new ReadableStream({
+          async pull(controller) {
+            try {
+              const { done, value } = await reader.read();
+              if (done) {
+                // Flush remaining buffer
+                if (buffer.trim()) controller.enqueue(encoder.encode(buffer));
+                buffer = '';
+                controller.close();
+                return;
+              }
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+              for (const line of lines) {
+                if (!line.startsWith('data: ')) {
+                  controller.enqueue(encoder.encode(line + '\n'));
+                  continue;
+                }
+
+                let data;
+                try { data = JSON.parse(line.slice(6)); } catch {
+                  controller.enqueue(encoder.encode(line + '\n'));
+                  continue;
+                }
+
+                // Intercept desktop tool_start events
+                if (data.type === 'tool_start' && data.tool && data.tool.startsWith('desktop_')) {
+                  // Execute locally and hold the result
+                  try {
+                    let args = {};
+                    try { args = typeof data.args === 'string' ? JSON.parse(data.args) : (data.args || {}); } catch { args = {}; }
+                    const localResult = await ctx.tools.execute(data.tool, args);
+                    pendingDesktopTool = { name: data.tool, result: localResult, iteration: data.iteration };
+                    // Emit the tool_start as-is (UI still shows "Using tool...")
+                    controller.enqueue(encoder.encode(line + '\n'));
+                  } catch (err) {
+                    console.debug('[Lodestone] Desktop tool local execution failed:', data.tool, err);
+                    // Let the original (server) result through
+                    controller.enqueue(encoder.encode(line + '\n'));
+                  }
+                  continue;
+                }
+
+                // Intercept desktop tool_result events — replace with local result
+                if (data.type === 'tool_result' && data.tool && data.tool.startsWith('desktop_') && pendingDesktopTool) {
+                  if (pendingDesktopTool.name === data.tool) {
+                    // Replace with our local result
+                    const localData = { ...data, content: pendingDesktopTool.result };
+                    controller.enqueue(encoder.encode('data: ' + JSON.stringify(localData) + '\n'));
+                    pendingDesktopTool = null;
+                    continue;
+                  }
+                }
+
+                // Pass through all other events unchanged
+                controller.enqueue(encoder.encode(line + '\n'));
+              }
+            } catch (err) {
+              console.error('[Lodestone] SSE stream error:', err);
+              try { controller.error(err); } catch { /* already closed */ }
+            }
+          },
+        });
+
+        return new Response(transformStream, {
+          headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
+        });
+      }
+
       return ctx.originalFetch.call(this, input, init);
     }
 
@@ -2160,13 +2489,21 @@ function LodestoneFetchOverride(ctx) {
       return new Response(JSON.stringify({ keys: [] }), { headers: { 'content-type': 'application/json' } });
     }
 
-    // GET /api/usage/credits
+    // GET /api/usage/credits — always pass through when user has a token; local mock only for offline/Community
     if (url === '/api/usage/credits' && method === 'GET') {
+      const token = (init?.headers?.Authorization || init?.headers?.authorization || '').replace('Bearer ', '') || localStorage.getItem('lodestone_access_token') || localStorage.getItem('lodest_access_token') || storage?.getAccessToken?.() || ctx?.storage?.getAccessToken?.();
+      if (token || ctx.currentTier === 'pro' || ctx.currentTier === 'studio') {
+        return ctx.originalFetch.call(this, input, init);
+      }
       return new Response(JSON.stringify({ creditsUsed: 0, creditsRemaining: -1, monthlyCredits: -1 }), { headers: { 'content-type': 'application/json' } });
     }
 
-    // GET /api/usage/tokens
+    // GET /api/usage/tokens — always pass through when user has a token; local mock only for offline/Community
     if (url === '/api/usage/tokens' && method === 'GET') {
+      const token = (init?.headers?.Authorization || init?.headers?.authorization || '').replace('Bearer ', '') || localStorage.getItem('lodestone_access_token') || localStorage.getItem('lodest_access_token') || storage?.getAccessToken?.() || ctx?.storage?.getAccessToken?.();
+      if (token || ctx.currentTier === 'pro' || ctx.currentTier === 'studio') {
+        return ctx.originalFetch.call(this, input, init);
+      }
       return new Response(JSON.stringify({ creditsUsed: 0, creditsRemaining: -1, monthlyCredits: -1 }), { headers: { 'content-type': 'application/json' } });
     }
 
@@ -2218,9 +2555,6 @@ function LodestoneFetchOverride(ctx) {
       return response;
     }
     return response;
-  } catch (err) {
-    console.error('[Lodestone] handleFetch error:', err.message, err.stack);
-    return ctx.originalFetch.call(this, input, init);
   }
 
   return handleFetch;
@@ -2244,7 +2578,7 @@ function LodestoneFetchOverride(ctx) {
   const ctx = {
     currentTier: null,
     syncEnabled: false,
-    originalFetch: window.__original_fetch || window.fetch,
+    originalFetch: (window.__original_fetch || window.fetch).bind(window),
   };
   window.__original_fetch = ctx.originalFetch;
 
@@ -2319,5 +2653,5 @@ function LodestoneFetchOverride(ctx) {
     }
   });
 
-  console.log('[Lodestone] Local-first data layer initialized. All tiers use local DB. Ollama routing active.');
+  console.debug('[Lodestone] Local-first data layer initialized. All tiers use local DB. Ollama routing active.');
 })();
