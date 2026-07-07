@@ -1,17 +1,18 @@
 {
   "name": "lodestone",
-  "version": "0.5.34",
+  "version": "0.5.44",
   "description": "Lodestone \u2014 Your AI brain, always learning",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "build:mac": "electron-builder --mac",
-    "build:mac-universal": "electron-builder --mac --universal",
+    "build:data-layer": "bash build-data-layer.sh",
+    "build:mac": "npm run build:data-layer && electron-builder --mac",
+    "build:mac-universal": "npm run build:data-layer && electron-builder --mac --universal",
     "build:win": "electron-builder --win",
     "build:linux": "electron-builder --linux",
-    "build": "electron-builder",
-    "pull-ui": "rsync -avz --delete root@159.89.239.126:/var/www/lodestone/ ui/ --exclude updates --exclude lodestone",
+    "build": "npm run build:data-layer && electron-builder",
+    "pull-ui": "rsync -avz --delete root@159.89.239.126:/var/www/lodestone/ ui/ --exclude updates --exclude lodestone --exclude downloads --exclude '*.dmg' --exclude '*.exe' --exclude '*.blockmap' --exclude dist.bak --exclude 'assets.bak.*' --exclude .DS_Store --exclude '*.pkg' --exclude '*.zip'",
     "postinstall": "electron-builder install-app-deps"
   },
   "author": "Greyrock Studio",
@@ -27,6 +28,7 @@
     "better-sqlite3": "^12.11.1",
     "electron-store": "^8.2.0",
     "electron-updater": "^6.3.9",
+    "socket.io-client": "^4.8.3",
     "ws": "^8.21.0"
   },
   "devDependencies": {
@@ -46,10 +48,36 @@
       "desktop-tools.js",
       "scheduler.js",
       "community-data-layer.js",
+      "build-data-layer.sh",
+      {
+        "from": "lib",
+        "to": "lib",
+        "filter": [
+          "**/*.js"
+        ]
+      },
+      {
+        "from": "brain",
+        "to": "brain",
+        "filter": [
+          "**/*.js"
+        ]
+      },
       "mcp-bridge.js",
       "mcp-servers.json",
       "protocol-handler.js",
-      "ui/**/*"
+      {
+        "from": "ui",
+        "to": "ui",
+        "filter": [
+          "**/*",
+          "!**/*.dmg",
+          "!**/*.zip",
+          "!**/*.blockmap",
+          "!**/*.exe",
+          "!**/dist.bak"
+        ]
+      }
     ],
     "asarUnpack": [
       "node_modules/better-sqlite3/**/*"
@@ -71,18 +99,19 @@
         {
           "target": "dmg",
           "arch": [
-            "arm64"
+            "universal"
           ]
         },
         {
           "target": "zip",
           "arch": [
-            "arm64"
+            "universal"
           ]
         }
       ],
       "minimumSystemVersion": "10.15",
-      "identity": "8A2CCFFDC7574EBDA389C957A1E4D90BF336915F"
+      "identity": "8A2CCFFDC7574EBDA389C957A1E4D90BF336915F",
+      "notarize": false
     },
     "dmg": {
       "contents": [
@@ -116,7 +145,7 @@
     },
     "publish": {
       "provider": "generic",
-      "url": "https://heylodestone.com/api/updates"
+      "url": "https://api.heylodestone.com/api/updates"
     }
   }
 }
