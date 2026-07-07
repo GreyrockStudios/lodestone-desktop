@@ -37,7 +37,7 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
     let html = fs.readFileSync(path.join(UI_DIR, "index.html"), "utf-8");
     html = html.replace(/<head([^>]*)>/i, `<head$1><script>${DESKTOP_DETECT_SCRIPT}<\/script><script>${communityDataLayerLoader}<\/script>`);
     localIndexHtml = html;
-    console.debug("[Lodestone] Loaded local index.html with desktop detection injected");
+    console.log("[Lodestone] Loaded local index.html with desktop detection injected");
   } catch (e) {
     console.error("[Lodestone] Failed to load local index.html:", e.message);
   }
@@ -45,7 +45,7 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
   return async function handleProtocol(request) {
     // Serve the data layer JS file directly (avoids 44KB inline script)
     if (request.url.includes("lodestone-data-layer.js")) {
-      // Serve the data layer JS file
+      console.log("[Lodestone] Serving data layer JS");
       return new Response(communityDataLayerScript, {
         status: 200,
         headers: { "content-type": "application/javascript", "access-control-allow-origin": "*" },
@@ -67,6 +67,7 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
 
       // SSE/streaming endpoints — must stream incrementally, not buffer
       const isSSE = urlPath.includes("/stream") || urlPath.includes("/sse") || urlPath.includes("/events");
+      console.log("[Lodestone] API proxy:", request.method, urlPath, isSSE ? "(SSE/streaming)" : "(buffered)");
 
       try {
         let body = null;
@@ -88,22 +89,17 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
         }
 
         if (isSSE) {
-          // SSE/streaming: two strategies depending on the endpoint.
-          // chat/stream: buffer the full response (Electron's protocol.handle ReadableStream
-          // doesn't deliver data to renderer reliably). The client parses SSE events from the body.
-          // notifications/stream: this is a long-lived EventSource connection that must stay open.
-          // We can't buffer it (it never completes). We also can't stream it through protocol.handle.
-          // Instead, we make a long-lived connection but cap it at 60s, then reconnect.
-          const isLongLivedStream = urlPath.includes("/notifications/stream") || urlPath.includes("/events");
-          const res = await fetchWithNode(realUrl, request.method, body, reqHeaders, isLongLivedStream ? 60000 : 0);
+          // SSE/streaming: Use manual ReadableStream via Node https.
+          // Electron's net.fetch is broken for streaming in protocol.handle (bug #47097),
+          // and Readable.toWeb() doesn't push chunks reliably in this context either.
+          // Only the manual ReadableStream approach delivers real-time SSE to the renderer.
+          const res = await fetchWithNodeStreaming(realUrl, request.method, body, reqHeaders);
           const headers = {};
           for (const [key, value] of Object.entries(res.headers)) {
             if (key.toLowerCase() !== "transfer-encoding") headers[key] = value;
           }
           headers["access-control-allow-origin"] = "*";
-          headers["content-type"] = "text/event-stream";
-          headers["cache-control"] = "no-cache";
-          return new Response(res.body, { status: res.status, headers });
+          return new Response(res.stream, { status: res.status, headers });
         } else {
           // Buffered: regular API call
           const res = await fetchWithNode(realUrl, request.method, body, reqHeaders);
@@ -132,6 +128,7 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
     // All non-API, non-asset paths serve index.html (SPA routing)
     if (!isAssetRequest && !hasFileExtension) {
       if (localIndexHtml) {
+        console.log("[Lodestone] Serving local index.html for:", urlPath || "/");
         return new Response(localIndexHtml, {
           status: 200,
           headers: { "content-type": "text/html; charset=utf-8", "access-control-allow-origin": "*" },
@@ -148,6 +145,7 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
         if (stat.isFile()) {
           const ext = path.extname(localPath).toLowerCase();
           const contentType = MIME_TYPES[ext] || "application/octet-stream";
+          console.log("[Lodestone] Serving local file:", parsedUrl.pathname);
           return new Response(fs.readFileSync(localPath), {
             status: 200,
             headers: { "content-type": contentType, "access-control-allow-origin": "*", "cache-control": "public, max-age=86400" },
@@ -155,6 +153,7 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
         }
       } catch (e) {
         // File not found locally — fall through to network fetch
+        console.log("[Lodestone] Local file not found, fetching from network:", parsedUrl.pathname);
       }
     }
 
@@ -169,6 +168,7 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
       realUrl = `https://${netParsed.hostname}/`;
     }
 
+    console.log("[Lodestone] Network fallback:", request.method, request.url, "→", realUrl);
 
     try {
       let body = null;
@@ -212,6 +212,7 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
       console.error("[Lodestone] Protocol error:", e.message || e);
       // If we have local HTML and the network is down, serve it as offline fallback
       if (localIndexHtml) {
+        console.log("[Lodestone] Network error, serving local HTML as offline fallback");
         return new Response(localIndexHtml, {
           status: 200,
           headers: { "content-type": "text/html; charset=utf-8", "access-control-allow-origin": "*" },

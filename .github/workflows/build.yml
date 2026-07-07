@@ -1,0 +1,325 @@
+name: Build & Release Desktop
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      build_mac:
+        description: 'Build macOS'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      build_win:
+        description: 'Build Windows'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      deploy_to_server:
+        description: 'Deploy to update server'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ── Determine version ──────────────────────────────────────────────
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      is_prerelease: ${{ steps.ver.outputs.is_prerelease }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: ver
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF" ]; then
+            VERSION=$(jq -r .version package.json)
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if [[ "$VERSION" == *"alpha"* || "$VERSION" == *"beta"* || "$VERSION" == *"rc"* ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+          echo "Building version: $VERSION"
+
+  # ── Pull UI from production ─────────────────────────────────────────
+  pull-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download production UI
+        run: |
+          mkdir -p ui
+          # Download the built web app from production
+          curl -sL https://heylodestone.com/ -o ui/index.html
+          # Download all assets
+          ASSETS_URL=$(grep -oP 'assets/index-[a-zA-Z0-9_-]+\.js' ui/index.html | head -1)
+          if [ -n "$ASSETS_URL" ]; then
+            mkdir -p ui/assets
+            curl -sL "https://heylodestone.com/$ASSETS_URL" -o "ui/$ASSETS_URL"
+          fi
+          # Download CSS
+          CSS_URL=$(grep -oP 'assets/index-[a-zA-Z0-9_-]+\.css' ui/index.html | head -1)
+          if [ -n "$CSS_URL" ]; then
+            curl -sL "https://heylodestone.com/$CSS_URL" -o "ui/$CSS_URL"
+          fi
+          echo "UI pulled from production"
+
+      - name: Upload UI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-assets
+          path: ui/
+
+  # ── Build macOS ────────────────────────────────────────────────────
+  build-mac:
+    needs: [version, pull-ui]
+    runs-on: macos-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.build_mac == 'true' || startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Download UI assets
+        uses: actions/download-artifact@v4
+        with:
+          name: ui-assets
+          path: ui/
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build macOS (unsigned)
+        run: npx electron-builder --mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate sha512 for macOS
+        id: mac-hash
+        run: |
+          DMG=$(find dist -name "*.dmg" -type f | head -1)
+          ZIP=$(find dist -name "*-mac.zip" -type f | head -1)
+          if [ -n "$DMG" ]; then
+            DMG_SHA=$(shasum -a 512 "$DMG" | awk '{print $1}')
+            DMG_SIZE=$(stat -f%z "$DMG")
+            echo "dmg_sha512=$DMG_SHA" >> $GITHUB_OUTPUT
+            echo "dmg_size=$DMG_SIZE" >> $GITHUB_OUTPUT
+            echo "dmg_file=$(basename $DMG)" >> $GITHUB_OUTPUT
+          fi
+          if [ -n "$ZIP" ]; then
+            ZIP_SHA=$(shasum -a 512 "$ZIP" | awk '{print $1}')
+            ZIP_SIZE=$(stat -f%z "$ZIP")
+            echo "zip_sha512=$ZIP_SHA" >> $GITHUB_OUTPUT
+            echo "zip_size=$ZIP_SIZE" >> $GITHUB_OUTPUT
+            echo "zip_file=$(basename $ZIP)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-build
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.blockmap
+
+  # ── Build Windows ──────────────────────────────────────────────────
+  build-win:
+    needs: [version, pull-ui]
+    runs-on: windows-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.build_win == 'true' || startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Download UI assets
+        uses: actions/download-artifact@v4
+        with:
+          name: ui-assets
+          path: ui/
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows (unsigned)
+        run: npx electron-builder --win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-build
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+
+  # ── Release & Deploy ──────────────────────────────────────────────
+  release:
+    needs: [version, build-mac, build-win]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Generate update manifests
+        id: manifest
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          DATE=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+
+          # Find files
+          DMG=$(find mac-build -name "*.dmg" -type f | head -1)
+          ZIP=$(find mac-build -name "*-mac.zip" -type f | head -1)
+          EXE=$(find win-build -name "*.exe" -type f | head -1)
+
+          # macOS manifest (latest-mac.yml)
+          cat > latest-mac.yml << EOF
+          version: ${VERSION}
+          files:
+          EOF
+
+          if [ -n "$ZIP" ]; then
+            ZIP_SHA=$(sha512sum "$ZIP" | awk '{print $1}')
+            ZIP_SIZE=$(stat -c%s "$ZIP")
+            ZIP_NAME=$(basename "$ZIP")
+            echo "  - url: ${ZIP_NAME}" >> latest-mac.yml
+            echo "    sha512: ${ZIP_SHA}" >> latest-mac.yml
+            echo "    size: ${ZIP_SIZE}" >> latest-mac.yml
+          fi
+
+          if [ -n "$DMG" ]; then
+            DMG_SHA=$(sha512sum "$DMG" | awk '{print $1}')
+            DMG_SIZE=$(stat -c%s "$DMG")
+            DMG_NAME=$(basename "$DMG")
+            echo "  - url: ${DMG_NAME}" >> latest-mac.yml
+            echo "    sha512: ${DMG_SHA}" >> latest-mac.yml
+            echo "    size: ${DMG_SIZE}" >> latest-mac.yml
+          fi
+
+          if [ -n "$ZIP" ]; then
+            ZIP_NAME=$(basename "$ZIP")
+            echo "path: ${ZIP_NAME}" >> latest-mac.yml
+            echo "sha512: ${ZIP_SHA}" >> latest-mac.yml
+            echo "releaseDate: '${DATE}'" >> latest-mac.yml
+          fi
+
+          # Windows manifest (latest.yml)
+          cat > latest.yml << EOF
+          version: ${VERSION}
+          files:
+          EOF
+
+          if [ -n "$EXE" ]; then
+            EXE_SHA=$(sha512sum "$EXE" | awk '{print $1}')
+            EXE_SIZE=$(stat -c%s "$EXE")
+            echo "  - url: Lodestone-Setup-${VERSION}.exe" >> latest.yml
+            echo "    sha512: ${EXE_SHA}" >> latest.yml
+            echo "    size: ${EXE_SIZE}" >> latest.yml
+            echo "path: Lodestone-Setup-${VERSION}.exe" >> latest.yml
+            echo "sha512: ${EXE_SHA}" >> latest.yml
+          fi
+
+          echo "releaseDate: '${DATE}'" >> latest.yml
+
+          echo "--- latest-mac.yml ---"
+          cat latest-mac.yml
+          echo "--- latest.yml ---"
+          cat latest.yml
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: ${{ needs.version.outputs.is_prerelease == 'true' }}
+          files: |
+            mac-build/*.dmg
+            mac-build/*.zip
+            win-build/*.exe
+            latest-mac.yml
+            latest.yml
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Deploy to update server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            # Download release assets to update server
+            VERSION="${{ needs.version.outputs.version }}"
+            cd /var/www/lodestone/updates
+
+            # Download from GitHub Release (detect actual filenames)
+            DMG_URL=$(curl -sL "https://api.github.com/repos/GreyrockStudios/lodestone-desktop/releases/tags/v${VERSION}" | jq -r '.assets[] | select(.name | endswith(".dmg")) | .browser_download_url' | head -1)
+            ZIP_URL=$(curl -sL "https://api.github.com/repos/GreyrockStudios/lodestone-desktop/releases/tags/v${VERSION}" | jq -r '.assets[] | select(.name | endswith("-mac.zip")) | .browser_download_url' | head -1)
+            EXE_URL=$(curl -sL "https://api.github.com/repos/GreyrockStudios/lodestone-desktop/releases/tags/v${VERSION}" | jq -r '.assets[] | select(.name | endswith(".exe")) | .browser_download_url' | head -1)
+
+            [ -n "$DMG_URL" ] && curl -sL "$DMG_URL" -O
+            [ -n "$ZIP_URL" ] && curl -sL "$ZIP_URL" -O
+            [ -n "$EXE_URL" ] && curl -sL "$EXE_URL" -O
+
+            # Also copy to downloads directory
+            cp *.dmg /var/www/lodestone/downloads/ 2>/dev/null || true
+            cp *.exe /var/www/lodestone/downloads/ 2>/dev/null || true
+
+      - name: Deploy manifests to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "latest-mac.yml,latest.yml"
+          target: /var/www/lodestone/updates
+
+  # ── Manual Deploy (workflow_dispatch with deploy_to_server) ────────
+  deploy-manual:
+    needs: [version, build-mac, build-win]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_to_server == 'true'
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Deploy to update server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "mac-build/*.dmg,mac-build/*.zip,win-build/*.exe"
+          target: /var/www/lodestone/updates
