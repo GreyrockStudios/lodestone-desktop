@@ -363,10 +363,24 @@ function initMCP(tools) {
 
   mcpClient = new MCPClient()
 
-  // IPC: Connect to MCP server
+  // IPC: Connect to MCP server — restricted to bundled/marketplace servers only
   ipcMain.handle('mcp:connect', async (_e, name, command, args, env) => {
+    // Only allow connecting to servers defined in mcp-servers.json
+    const allowed = [...getBundledServers(), ...getMarketplaceServers()]
+    const serverDef = allowed.find(s => s.id === name || s.command === command)
+    if (!serverDef) {
+      return { error: `MCP server "${name}" not in allowed list. Only bundled/marketplace servers can be connected.` }
+    }
+    // Use the command from the server definition, not the renderer-provided one
+    const resolvedCommand = serverDef.command === 'node' ? process.execPath : serverDef.command
+    const resolvedArgs = (serverDef.args || []).map(a => {
+      if (a.startsWith('node_modules/')) return path.join(path.dirname(require.main.filename), a)
+      if (a === '$HOME') return os.homedir()
+      return a
+    })
+    const resolvedEnv = { ...serverDef.env, NODE_PATH: [path.join(path.dirname(require.main.filename), 'node_modules'), process.env.NODE_PATH].filter(Boolean).join(path.delimiter) }
     try {
-      return await mcpClient.connect(name, command, args, env)
+      return await mcpClient.connect(name, resolvedCommand, resolvedArgs, resolvedEnv)
     } catch (err) {
       return { error: err.message }
     }
