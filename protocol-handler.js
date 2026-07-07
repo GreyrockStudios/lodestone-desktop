@@ -48,7 +48,7 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
       // Serve the data layer JS file
       return new Response(communityDataLayerScript, {
         status: 200,
-        headers: { "content-type": "application/javascript", "access-control-allow-origin": "*" },
+        headers: { "content-type": "application/javascript", "access-control-allow-origin": "*", "X-Content-Type-Options": "nosniff", "X-Content-Type-Options": "nosniff" },
       });
     }
 
@@ -118,7 +118,7 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
         console.error("[Lodestone] API proxy error:", e.message);
         return new Response(JSON.stringify({ error: "Network error" }), {
           status: 502,
-          headers: { "content-type": "application/json", "access-control-allow-origin": "*" },
+          headers: { "content-type": "application/json", "access-control-allow-origin": "*", "X-Content-Type-Options": "nosniff" },
         });
       }
     }
@@ -134,7 +134,7 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
       if (localIndexHtml) {
         return new Response(localIndexHtml, {
           status: 200,
-          headers: { "content-type": "text/html; charset=utf-8", "access-control-allow-origin": "*" },
+          headers: { "content-type": "text/html; charset=utf-8", "access-control-allow-origin": "*", "X-Content-Type-Options": "nosniff" },
         });
       }
       // Fall through to network if local file not available
@@ -142,7 +142,11 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
 
     // ─── Static asset requests: serve from local ui/ directory ───
     if (isAssetRequest || hasFileExtension) {
-      const localPath = path.join(UI_DIR, parsedUrl.pathname);
+      const localPath = path.resolve(UI_DIR, parsedUrl.pathname);
+      // Prevent path traversal: resolved path must be within UI_DIR
+      if (!localPath.startsWith(UI_DIR + path.sep) && localPath !== UI_DIR) {
+        return new Response("Forbidden", { status: 403 });
+      }
       try {
         const stat = fs.statSync(localPath);
         if (stat.isFile()) {
@@ -150,7 +154,7 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
           const contentType = MIME_TYPES[ext] || "application/octet-stream";
           return new Response(fs.readFileSync(localPath), {
             status: 200,
-            headers: { "content-type": contentType, "access-control-allow-origin": "*", "cache-control": "public, max-age=86400" },
+            headers: { "content-type": contentType, "access-control-allow-origin": "*", "X-Content-Type-Options": "nosniff", "cache-control": "public, max-age=86400" },
           });
         }
       } catch (e) {
@@ -163,8 +167,12 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
     const rHashIdx = realUrl.indexOf("#");
     if (rHashIdx !== -1) realUrl = realUrl.substring(0, rHashIdx);
 
-    // Normalize SPA paths for network requests too
+    // Only allow network fetches to known Lodestone hosts (prevent SSRF)
+    const ALLOWED_HOSTS = ["heylodestone.com", "www.heylodestone.com", "api.heylodestone.com"];
     const netParsed = new URL(realUrl);
+    if (!ALLOWED_HOSTS.includes(netParsed.hostname)) {
+      return new Response("Forbidden: disallowed host", { status: 403 });
+    }
     if (!netParsed.pathname.startsWith("/api/") && !netParsed.pathname.startsWith("/assets/") && !netParsed.pathname.startsWith("/lodestone") && netParsed.pathname !== "/" && !netParsed.pathname.includes(".")) {
       realUrl = `https://${netParsed.hostname}/`;
     }
@@ -198,7 +206,7 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
         }
         return new Response(html, {
           status: res.status,
-          headers: { "content-type": "text/html; charset=utf-8", "access-control-allow-origin": "*" },
+          headers: { "content-type": "text/html; charset=utf-8", "access-control-allow-origin": "*", "X-Content-Type-Options": "nosniff" },
         });
       }
 
@@ -214,7 +222,7 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
       if (localIndexHtml) {
         return new Response(localIndexHtml, {
           status: 200,
-          headers: { "content-type": "text/html; charset=utf-8", "access-control-allow-origin": "*" },
+          headers: { "content-type": "text/html; charset=utf-8", "access-control-allow-origin": "*", "X-Content-Type-Options": "nosniff" },
         });
       }
       return new Response(
