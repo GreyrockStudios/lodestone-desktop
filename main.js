@@ -8,6 +8,12 @@ const { getMainWindow } = require("./lib/main/window");
 const { handleDeepLink } = require("./lib/main/deep-link");
 const { onReady, onWindowAllClosed, onBeforeQuit, onWillQuit, onOpenUrl } = require("./lib/main/app-lifecycle");
 
+// GPU crash workaround: some Windows GPU drivers cause Chromium to crash on startup.
+// --disable-gpu uses software rendering; --in-process-gpu prevents the separate GPU
+// process from crashing and taking the renderer with it.
+app.commandLine.appendSwitch("disable-gpu");
+app.commandLine.appendSwitch("in-process-gpu");
+
 // Register custom scheme before app is ready
 protocol.registerSchemesAsPrivileged([
   {
