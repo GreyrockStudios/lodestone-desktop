@@ -59,71 +59,9 @@ jobs:
           fi
           echo "Building version: $VERSION"
 
-  # ── Pull UI from production ─────────────────────────────────────────
-  pull-ui:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download production UI
-        run: |
-          mkdir -p ui/assets
-          # Download the built web app from production
-          curl -sL https://heylodestone.com/ -o ui/index.html
-          # Download support page
-          curl -sL https://heylodestone.com/support.html -o ui/support.html 2>/dev/null || true
-          # Download manifest and icons
-          curl -sL https://heylodestone.com/manifest.json -o ui/manifest.json 2>/dev/null || true
-          curl -sL https://heylodestone.com/og-image.png -o ui/og-image.png 2>/dev/null || true
-          curl -sL https://heylodestone.com/favicon.ico -o ui/favicon.ico 2>/dev/null || true
-          curl -sL https://heylodestone.com/icon.png -o ui/icon.png 2>/dev/null || true
-          # Download ALL assets referenced in index.html (JS, CSS, modulepreload)
-          grep -oE 'assets/[A-Za-z0-9_.-]+' ui/index.html | sort -u | while read asset; do
-            echo "Downloading $asset..."
-            curl -sL "https://heylodestone.com/$asset" -o "ui/$asset"
-          done
-          # Download the main JS bundle to parse for lazy-loaded chunks
-          MAIN_JS=$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' ui/index.html | head -1)
-          if [ -n "$MAIN_JS" ]; then
-            curl -sL "https://heylodestone.com/$MAIN_JS" -o "ui/$MAIN_JS"
-            # Extract ALL lazy-loaded chunk references from the main JS
-            grep -oE 'assets/[A-Za-z0-9_.-]+\.(js|css)' "ui/$MAIN_JS" | sort -u | while read chunk; do
-              if [ ! -f "ui/$chunk" ]; then
-                echo "Downloading lazy chunk: $chunk"
-                curl -sL "https://heylodestone.com/$chunk" -o "ui/$chunk"
-              fi
-            done
-            # Also extract font references
-            grep -oE 'assets/[A-Za-z0-9_.-]+\.(woff2?|ttf)' "ui/$MAIN_JS" | sort -u | while read font; do
-              if [ ! -f "ui/$font" ]; then
-                echo "Downloading font: $font"
-                curl -sL "https://heylodestone.com/$font" -o "ui/$font"
-              fi
-            done
-          fi
-          # Download CSS-referenced assets (fonts, images)
-          for css in ui/assets/*.css; do
-            if [ -f "$css" ]; then
-              grep -oE 'assets/[A-Za-z0-9_.-]+\.(woff2?|ttf|png|svg)' "$css" | sort -u | while read asset; do
-                if [ ! -f "ui/$asset" ]; then
-                  echo "Downloading CSS asset: $asset"
-                  curl -sL "https://heylodestone.com/$asset" -o "ui/$asset"
-                fi
-              done
-            fi
-          done
-          # Count what we got
-          echo "=== Downloaded files ==="
-          find ui/ -type f | wc -l
-          find ui/assets/ -type f | wc -l
-
-      - name: Upload UI artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-assets
-          path: ui/
-
   # ── Build macOS (arm64 only — universal fails with better-sqlite3) ───
   build-mac:
-    needs: [version, pull-ui]
+    needs: [version]
     runs-on: macos-latest
     if: github.event_name == 'workflow_dispatch' && inputs.build_mac == 'true' || startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -136,11 +74,35 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: Download UI assets
-        uses: actions/download-artifact@v4
-        with:
-          name: ui-assets
-          path: ui/
+      - name: Pull UI from production
+        shell: bash
+        run: |
+          mkdir -p ui/assets
+          curl -sL https://heylodestone.com/ -o ui/index.html
+          curl -sL https://heylodestone.com/support.html -o ui/support.html 2>/dev/null || true
+          curl -sL https://heylodestone.com/manifest.json -o ui/manifest.json 2>/dev/null || true
+          curl -sL https://heylodestone.com/og-image.png -o ui/og-image.png 2>/dev/null || true
+          curl -sL https://heylodestone.com/favicon.ico -o ui/favicon.ico 2>/dev/null || true
+          curl -sL https://heylodestone.com/icon.png -o ui/icon.png 2>/dev/null || true
+          grep -oE 'assets/[A-Za-z0-9_.-]+' ui/index.html | sort -u | while read asset; do
+            curl -sL "https://heylodestone.com/$asset" -o "ui/$asset"
+          done
+          MAIN_JS=$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' ui/index.html | head -1)
+          if [ -n "$MAIN_JS" ]; then
+            curl -sL "https://heylodestone.com/$MAIN_JS" -o "ui/$MAIN_JS"
+            grep -oE 'assets/[A-Za-z0-9_.-]+\.(js|css)' "ui/$MAIN_JS" | sort -u | while read chunk; do
+              [ ! -f "ui/$chunk" ] && curl -sL "https://heylodestone.com/$chunk" -o "ui/$chunk"
+            done
+            grep -oE 'assets/[A-Za-z0-9_.-]+\.(woff2?|ttf)' "ui/$MAIN_JS" | sort -u | while read font; do
+              [ ! -f "ui/$font" ] && curl -sL "https://heylodestone.com/$font" -o "ui/$font"
+            done
+          fi
+          for css in ui/assets/*.css; do
+            [ -f "$css" ] && grep -oE 'assets/[A-Za-z0-9_.-]+\.(woff2?|ttf|png|svg)' "$css" | sort -u | while read asset; do
+              [ ! -f "ui/$asset" ] && curl -sL "https://heylodestone.com/$asset" -o "ui/$asset"
+            done
+          done
+          echo "Downloaded $(find ui/ -type f | wc -l) files"
 
       - name: Install dependencies
         run: npm ci
@@ -164,7 +126,7 @@ jobs:
 
   # ── Build Windows (x64 + arm64) ──────────────────────────────────────
   build-win:
-    needs: [version, pull-ui]
+    needs: [version]
     runs-on: windows-latest
     if: github.event_name == 'workflow_dispatch' && inputs.build_win == 'true' || startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -177,11 +139,35 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: Download UI assets
-        uses: actions/download-artifact@v4
-        with:
-          name: ui-assets
-          path: ui/
+      - name: Pull UI from production
+        shell: bash
+        run: |
+          mkdir -p ui/assets
+          curl -sL https://heylodestone.com/ -o ui/index.html
+          curl -sL https://heylodestone.com/support.html -o ui/support.html 2>/dev/null || true
+          curl -sL https://heylodestone.com/manifest.json -o ui/manifest.json 2>/dev/null || true
+          curl -sL https://heylodestone.com/og-image.png -o ui/og-image.png 2>/dev/null || true
+          curl -sL https://heylodestone.com/favicon.ico -o ui/favicon.ico 2>/dev/null || true
+          curl -sL https://heylodestone.com/icon.png -o ui/icon.png 2>/dev/null || true
+          grep -oE 'assets/[A-Za-z0-9_.-]+' ui/index.html | sort -u | while read asset; do
+            curl -sL "https://heylodestone.com/$asset" -o "ui/$asset"
+          done
+          MAIN_JS=$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' ui/index.html | head -1)
+          if [ -n "$MAIN_JS" ]; then
+            curl -sL "https://heylodestone.com/$MAIN_JS" -o "ui/$MAIN_JS"
+            grep -oE 'assets/[A-Za-z0-9_.-]+\.(js|css)' "ui/$MAIN_JS" | sort -u | while read chunk; do
+              [ ! -f "ui/$chunk" ] && curl -sL "https://heylodestone.com/$chunk" -o "ui/$chunk"
+            done
+            grep -oE 'assets/[A-Za-z0-9_.-]+\.(woff2?|ttf)' "ui/$MAIN_JS" | sort -u | while read font; do
+              [ ! -f "ui/$font" ] && curl -sL "https://heylodestone.com/$font" -o "ui/$font"
+            done
+          fi
+          for css in ui/assets/*.css; do
+            [ -f "$css" ] && grep -oE 'assets/[A-Za-z0-9_.-]+\.(woff2?|ttf|png|svg)' "$css" | sort -u | while read asset; do
+              [ ! -f "ui/$asset" ] && curl -sL "https://heylodestone.com/$asset" -o "ui/$asset"
+            done
+          done
+          echo "Downloaded $(find ui/ -type f | wc -l) files"
 
       - name: Install dependencies
         run: npm ci
