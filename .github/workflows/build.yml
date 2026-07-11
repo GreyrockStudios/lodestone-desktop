@@ -66,38 +66,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: Pull UI from production
-        run: |
-          mkdir -p ui/assets
-          curl -sfL https://heylodestone.com/ -o ui/index.html
-          curl -sfL https://heylodestone.com/support.html -o ui/support.html || true
-          curl -sfL https://heylodestone.com/manifest.json -o ui/manifest.json || true
-          curl -sfL https://heylodestone.com/og-image.png -o ui/og-image.png || true
-          curl -sfL https://heylodestone.com/favicon.ico -o ui/favicon.ico || true
-          curl -sfL https://heylodestone.com/icon.png -o ui/icon.png || true
-          grep -oE 'assets/[A-Za-z0-9_.-]+' ui/index.html | sort -u | while read -r asset; do
-            curl -sfL "https://heylodestone.com/$asset" -o "ui/$asset" || true
-          done
-          MAIN_JS=$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' ui/index.html | head -1 || true)
-          if [ -n "$MAIN_JS" ]; then
-            curl -sfL "https://heylodestone.com/$MAIN_JS" -o "ui/$MAIN_JS" || true
-            grep -oE 'assets/[A-Za-z0-9_.-]+\.(js|css)' "ui/$MAIN_JS" 2>/dev/null | sort -u | while read -r chunk; do
-              [ -f "ui/$chunk" ] || curl -sfL "https://heylodestone.com/$chunk" -o "ui/$chunk" || true
-            done
-            grep -oE 'assets/[A-Za-z0-9_.-]+\.(woff2?|ttf)' "ui/$MAIN_JS" 2>/dev/null | sort -u | while read -r font; do
-              [ -f "ui/$font" ] || curl -sfL "https://heylodestone.com/$font" -o "ui/$font" || true
-            done
-          fi
-          for css in ui/assets/*.css; do
-            [ -f "$css" ] || continue
-            grep -oE 'assets/[A-Za-z0-9_.-]+\.(woff2?|ttf|png|svg)' "$css" 2>/dev/null | sort -u | while read -r asset; do
-              [ -f "ui/$asset" ] || curl -sfL "https://heylodestone.com/$asset" -o "ui/$asset" || true
-            done
-          done
-          FILE_COUNT=$(find ui/ -type f | wc -l | tr -d ' ')
-          echo "Downloaded $FILE_COUNT UI files"
-          [ "$FILE_COUNT" -gt 5 ] || { echo "Too few UI files downloaded ($FILE_COUNT)"; exit 1; }
-
       - name: Install dependencies
         run: npm ci
 
@@ -145,39 +113,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: Pull UI from production
-        shell: bash
-        run: |
-          mkdir -p ui/assets
-          curl -sfL https://heylodestone.com/ -o ui/index.html
-          curl -sfL https://heylodestone.com/support.html -o ui/support.html || true
-          curl -sfL https://heylodestone.com/manifest.json -o ui/manifest.json || true
-          curl -sfL https://heylodestone.com/og-image.png -o ui/og-image.png || true
-          curl -sfL https://heylodestone.com/favicon.ico -o ui/favicon.ico || true
-          curl -sfL https://heylodestone.com/icon.png -o ui/icon.png || true
-          grep -oE 'assets/[A-Za-z0-9_.-]+' ui/index.html | sort -u | while read -r asset; do
-            curl -sfL "https://heylodestone.com/$asset" -o "ui/$asset" || true
-          done
-          MAIN_JS=$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' ui/index.html | head -1 || true)
-          if [ -n "$MAIN_JS" ]; then
-            curl -sfL "https://heylodestone.com/$MAIN_JS" -o "ui/$MAIN_JS" || true
-            grep -oE 'assets/[A-Za-z0-9_.-]+\.(js|css)' "ui/$MAIN_JS" 2>/dev/null | sort -u | while read -r chunk; do
-              [ -f "ui/$chunk" ] || curl -sfL "https://heylodestone.com/$chunk" -o "ui/$chunk" || true
-            done
-            grep -oE 'assets/[A-Za-z0-9_.-]+\.(woff2?|ttf)' "ui/$MAIN_JS" 2>/dev/null | sort -u | while read -r font; do
-              [ -f "ui/$font" ] || curl -sfL "https://heylodestone.com/$font" -o "ui/$font" || true
-            done
-          fi
-          for css in ui/assets/*.css; do
-            [ -f "$css" ] || continue
-            grep -oE 'assets/[A-Za-z0-9_.-]+\.(woff2?|ttf|png|svg)' "$css" 2>/dev/null | sort -u | while read -r asset; do
-              [ -f "ui/$asset" ] || curl -sfL "https://heylodestone.com/$asset" -o "ui/$asset" || true
-            done
-          done
-          FILE_COUNT=$(find ui/ -type f | wc -l | tr -d ' ')
-          echo "Downloaded $FILE_COUNT UI files"
-          [ "$FILE_COUNT" -gt 5 ] || { echo "Too few UI files downloaded ($FILE_COUNT)"; exit 1; }
-
       - name: Install dependencies
         run: npm ci
 
@@ -220,6 +155,9 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download release files from server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -243,7 +181,7 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: "/tmp/release-assets/*"
           target: release-assets
-          strip_components: 1
+          strip_components: 2
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
