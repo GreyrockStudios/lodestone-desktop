@@ -1,6 +1,6 @@
 {
   "name": "lodestone",
-  "version": "0.5.48",
+  "version": "0.5.49",
   "description": "Lodestone — Your AI brain, always learning",
   "main": "main.js",
   "scripts": {
@@ -82,12 +82,6 @@
     "asarUnpack": [
       "node_modules/better-sqlite3/**/*"
     ],
-    "extraResources": [
-      {
-        "from": "ui",
-        "to": "ui"
-      }
-    ],
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "assets/icon.icns",
@@ -99,13 +93,7 @@
         {
           "target": "dmg",
           "arch": [
-            "universal"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "universal"
+            "arm64"
           ]
         }
       ],
@@ -129,11 +117,15 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.ico",
+      "artifactName": "Lodestone-Setup-${version}-${arch}.exe"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "differentialPackage": true,
+      "artifactName": "Lodestone-Setup-${version}-${arch}.exe"
     },
     "linux": {
       "target": [

@@ -142,9 +142,15 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
 
     // ─── Static asset requests: serve from local ui/ directory ───
     if (isAssetRequest || hasFileExtension) {
-      const localPath = path.resolve(UI_DIR, parsedUrl.pathname);
+      // Normalize the URL path to OS-specific separators for proper path resolution
+      const normalizedPath = parsedUrl.pathname.replace(/\//g, path.sep);
+      const localPath = path.resolve(UI_DIR, normalizedPath);
       // Prevent path traversal: resolved path must be within UI_DIR
-      if (!localPath.startsWith(UI_DIR + path.sep) && localPath !== UI_DIR) {
+      // Use case-insensitive comparison on Windows and normalize separators
+      const normalizedLocal = path.normalize(localPath).toLowerCase();
+      const normalizedUI = path.normalize(UI_DIR).toLowerCase();
+      if (!normalizedLocal.startsWith(normalizedUI + path.sep) && normalizedLocal !== normalizedUI) {
+        console.error("[Lodestone] Path traversal blocked:", localPath, "UI_DIR:", UI_DIR);
         return new Response("Forbidden", { status: 403 });
       }
       try {

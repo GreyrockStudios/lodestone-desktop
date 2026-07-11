@@ -73,7 +73,12 @@ find dist -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" 
 done
 
 echo ""
-echo "📤 To deploy updates:"
+echo "📤 To deploy macOS updates:"
 echo "  rsync -avz dist/latest-mac.yml ${DEPLOY_SERVER}:${DEPLOY_PATH}/updates/"
 echo "  rsync -avz dist/Lodestone-*.dmg ${DEPLOY_SERVER}:${DEPLOY_PATH}/downloads/"
 echo "  rsync -avz dist/Lodestone-*.blockmap ${DEPLOY_SERVER}:${DEPLOY_PATH}/updates/"
+echo ""
+echo "📤 To deploy Windows updates:"
+echo "  rsync -avz dist/latest.yml ${DEPLOY_SERVER}:${DEPLOY_PATH}/updates/"
+echo "  rsync -avz dist/Lodestone-Setup-*.exe ${DEPLOY_SERVER}:${DEPLOY_PATH}/updates/"
+echo "  rsync -avz dist/Lodestone-Setup-*.exe.blockmap ${DEPLOY_SERVER}:${DEPLOY_PATH}/updates/"
