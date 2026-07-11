@@ -1,6 +1,5 @@
 node_modules/
 dist/
-ui/
 *.dmg
 *.exe
 *.AppImage
@@ -9,5 +8,4 @@ ui/
 Thumbs.db
 .envLodestone Setup *.exe.blockmap
 win-build/
-ui-assets/
 index.html

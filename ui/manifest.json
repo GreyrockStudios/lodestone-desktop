@@ -1,0 +1,16 @@
+{
+  "name": "Lodestone",
+  "short_name": "Lodestone",
+  "description": "Your AI life assistant",
+  "start_url": "/chat",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}

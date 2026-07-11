@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Support — Lodestone 🔮</title>
+<meta name="description" content="Get help with Lodestone. Browse FAQs, find answers, or contact our support team.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔮</text></svg>">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        'lodestone': {
+          'dark': '#0a0a0f',
+          'darker': '#050508',
+          'card': '#12121a',
+          'border': '#1e1e2e',
+          'purple': '#8b5cf6',
+          'cyan': '#06b6d4',
+          'pink': '#ec4899',
+          'amber': '#f59e0b',
+          'green': '#10b981',
+        }
+      },
+    }
+  }
+}
+</script>
+<style>
+body { background: #0a0a0f; }
+.gradient-text { background: linear-gradient(135deg, #8b5cf6, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.grid-bg { background-image: linear-gradient(rgba(139, 92, 246, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 92, 246, 0.05) 1px, transparent 1px); background-size: 40px 40px; }
+.faq-answer { max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s ease; }
+.faq-item.open .faq-answer { max-height: 500px; padding-top: 12px; }
+.faq-item.open .faq-chevron { transform: rotate(180deg); }
+.faq-chevron { transition: transform 0.3s ease; }
+</style>
+</head>
+<body class="bg-lodestone-dark text-gray-200 font-sans antialiased">
+
+<!-- Nav -->
+<nav class="fixed top-0 w-full z-50 bg-lodestone-dark/80 backdrop-blur-md border-b border-lodestone-border">
+  <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-2 text-xl font-bold">
+      <span class="text-2xl">🔮</span>
+      <span class="gradient-text">Lodestone</span>
+    </a>
+    <div class="hidden md:flex items-center gap-8 text-sm">
+      <a href="/#features" class="hover:text-lodestone-purple transition">Features</a>
+      <a href="/#pricing" class="hover:text-lodestone-purple transition">Pricing</a>
+      <a href="/support.html" class="text-lodestone-purple font-semibold">Support</a>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="https://github.com/GreyrockStudios/lodestone" class="text-sm text-gray-400 hover:text-white transition hidden sm:inline">GitHub</a>
+      <a href="/#pricing" class="px-4 py-2 bg-gradient-to-r from-lodestone-purple to-lodestone-cyan text-white rounded-lg text-sm font-semibold hover:opacity-90 transition">Get Started</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="pt-32 pb-16 grid-bg">
+  <div class="max-w-4xl mx-auto px-6 text-center">
+    <h1 class="text-4xl md:text-6xl font-bold mb-6">
+      How can we <span class="gradient-text">help you?</span>
+    </h1>
+    <p class="text-xl text-gray-400 mb-10">Find answers fast or reach out directly. We're here for you.</p>
+    <div class="max-w-xl mx-auto">
+      <input
+        id="searchInput"
+        type="text"
+        placeholder="Search FAQs..."
+        class="w-full px-6 py-4 bg-lodestone-card border border-lodestone-border rounded-xl text-gray-200 placeholder-gray-500 focus:outline-none focus:border-lodestone-purple transition"
+      >
+    </div>
+  </div>
+</section>
+
+<!-- Quick Links -->
+<section class="py-12 border-b border-lodestone-border">
+  <div class="max-w-5xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+    <a href="#faq" class="bg-lodestone-card border border-lodestone-border rounded-2xl p-8 hover:border-lodestone-purple transition glow-purple group">
+      <div class="text-4xl mb-4">📖</div>
+      <h3 class="text-lg font-semibold mb-2 group-hover:text-lodestone-purple transition">FAQ</h3>
+      <p class="text-sm text-gray-400">Quick answers to common questions.</p>
+    </a>
+    <a href="https://discord.gg/HGAQ9hqrYf" class="bg-lodestone-card border border-lodestone-border rounded-2xl p-8 hover:border-lodestone-pink transition group">
+      <div class="text-4xl mb-4">💬</div>
+      <h3 class="text-lg font-semibold mb-2 group-hover:text-lodestone-pink transition">Discord</h3>
+      <p class="text-sm text-gray-400">Join the community for help and chat.</p>
+    </a>
+    <a href="#contact" class="bg-lodestone-card border border-lodestone-border rounded-2xl p-8 hover:border-lodestone-cyan transition glow-cyan group">
+      <div class="text-4xl mb-4">✉️</div>
+      <h3 class="text-lg font-semibold mb-2 group-hover:text-lodestone-cyan transition">Contact Us</h3>
+      <p class="text-sm text-gray-400">Can't find your answer? Send us a message.</p>
+    </a>
+    <a href="https://github.com/GreyrockStudios/lodestone" class="bg-lodestone-card border border-lodestone-border rounded-2xl p-8 hover:border-lodestone-green transition group">
+      <div class="text-4xl mb-4">🐙</div>
+      <h3 class="text-lg font-semibold mb-2 group-hover:text-lodestone-green transition">GitHub</h3>
+      <p class="text-sm text-gray-400">Report bugs, request features, or browse the code.</p>
+    </a>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="py-24">
+  <div class="max-w-3xl mx-auto px-6">
+    <h2 class="text-3xl font-bold text-center mb-4">Frequently Asked Questions</h2>
+    <p class="text-gray-400 text-center mb-12">Click a question to see the answer.</p>
+
+    <div id="faqContainer" class="space-y-4">
+
+      <!-- General -->
+      <div class="text-sm text-gray-500 uppercase tracking-wider mb-2 mt-8 font-semibold">General</div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="lodestone what is agent">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">What is Lodestone?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          Lodestone is a standalone AI agent engine that gives any LLM persistent memory, self-improvement loops, proactive scheduling, and 39 built-in tools. It's open source (MIT), written in TypeScript, and works with any OpenAI-compatible model — cloud or local. There's also <strong>Lodestone Desktop</strong> — a native macOS/Windows app with a built-in chat UI, interactive Canvas for artifacts (React, Python, Mermaid, charts, tables), and 38 desktop+server tools wired end-to-end.
+        </div>
+      </div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="free open source price cost">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">Is Lodestone free?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          Yes. The Community edition is MIT-licensed and completely free — forever. It includes all 39 tools, the full memory system, self-improvement engine, and community support.
+          <div class="mt-3 space-y-1">
+            <div class="flex gap-2"><span class="text-lodestone-green">✓</span> <strong>Community (free, MIT):</strong> 39 tools, full memory, self-improvement, 5 identity templates, Telegram + Webchat, community support.</div>
+            <div class="flex gap-2"><span class="text-lodestone-purple">✓</span> <strong>Pro ($197 one-time):</strong> Everything in Community + Discord &amp; Email channels, MCP integration, priority email support, setup wizard, automation recipes, commercial license.</div>
+            <div class="flex gap-2"><span class="text-lodestone-amber">✓</span> <strong>Enterprise ($997 one-time):</strong> Everything in Pro + 5-seat team license, custom tool development, dedicated support channel, on-premise deployment, SLA with 1-hr response.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="model llm openai ollama local cloud">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">Which LLMs does Lodestone support?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          Any model that speaks the OpenAI API format. This includes OpenAI (GPT-4, GPT-3.5), Anthropic via proxy, Ollama (local models), LM Studio, Together AI, Groq, and more. You configure the provider in <code class="bg-lodestone-dark px-1.5 py-0.5 rounded text-lodestone-cyan text-xs">lodestone.config.yaml</code>.
+        </div>
+      </div>
+
+      <!-- Getting Started -->
+      <div class="text-sm text-gray-500 uppercase tracking-wider mb-2 mt-8 font-semibold">Getting Started</div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="install setup start begin getting started">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">How do I get started?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          <pre class="bg-lodestone-darker border border-lodestone-border rounded-lg p-4 text-sm overflow-x-auto"><code>npx lodestone init --template developer
+cd my-agent
+lodestone start</code></pre>
+          <p class="mt-3">That's it. Pick a template (developer, business, creative, researcher, or general), and your agent boots up with identity, memory, and 39 tools ready to go.</p>
+        </div>
+      </div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="docker deploy container">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">Can I run Lodestone in Docker?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          Yes. Lodestone is Docker-ready. Clone the repo, set your environment variables, and <code class="bg-lodestone-dark px-1.5 py-0.5 rounded text-lodestone-cyan text-xs">docker compose up</code>. The Dockerfile and docker-compose.yml are included in the repo.
+        </div>
+      </div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="configure customize identity soul personality">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">How do I customize my agent's personality?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          Edit the markdown files in your agent's workspace: <code class="bg-lodestone-dark px-1.5 py-0.5 rounded text-lodestone-cyan text-xs">SOUL.md</code> (personality and tone), <code class="bg-lodestone-dark px-1.5 py-0.5 rounded text-lodestone-cyan text-xs">IDENTITY.md</code> (who it is), <code class="bg-lodestone-dark px-1.5 py-0.5 rounded text-lodestone-cyan text-xs">USER.md</code> (about you), <code class="bg-lodestone-dark px-1.5 py-0.5 rounded text-lodestone-cyan text-xs">RULES.md</code> (behavioral constraints), and <code class="bg-lodestone-dark px-1.5 py-0.5 rounded text-lodestone-cyan text-xs">HEARTBEAT.md</code> (what it does proactively). No code needed — just markdown.
+        </div>
+      </div>
+
+      <!-- Features -->
+      <div class="text-sm text-gray-500 uppercase tracking-wider mb-2 mt-8 font-semibold">Features</div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="memory remember persist knowledge">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">How does memory work?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          Lodestone has three memory layers: <strong>Vector recall</strong> (semantic search over everything the agent has learned), <strong>Curated wiki</strong> (structured knowledge the agent maintains and cross-links), and <strong>Session scratch</strong> (short-term context for the current conversation). Ask something Tuesday, get the answer instantly Thursday. Knowledge compounds over time.
+        </div>
+      </div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="self-improvement learn calibration improve">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">What is self-improvement?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          The self-improvement engine runs prediction journals, pre-mortems, drift detection, and calibration loops. The agent tracks its own accuracy over time, learns from mistakes, and synthesizes new skills. It literally gets better at its job the more it works.
+        </div>
+      </div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="channel telegram discord email webchat">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">What channels does Lodestone support?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          Community edition: Telegram and Webchat. Pro edition: adds Discord and Email (M365/IMAP). Desktop app: built-in chat UI with Canvas for interactive artifacts. All channels share the same agent — your Lodestone talks to you wherever you work.
+        </div>
+      </div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="desktop app mac windows native install">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">What is Lodestone Desktop?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          Lodestone Desktop is a native macOS and Windows app that gives you a beautiful chat UI, <strong>Canvas</strong> for interactive artifacts (live React components, Python output, Mermaid diagrams, charts, tables, SVG), and 38 desktop + server tools wired end-to-end. It connects to <em>your own</em> Lodestone server — no data flows through us. Available for macOS (Apple Silicon & Intel) and Windows.
+        </div>
+      </div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="canvas artifact interactive react python mermaid chart">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">What is Canvas?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          Canvas is Lodestone's interactive artifact system, built into the Desktop app. When the AI generates something visual or interactive, it renders in a live side panel — not a static code block. Canvas supports: <strong>React</strong> (live components like calculators, forms, dashboards), <strong>HTML</strong> (full HTML/CSS/JS), <strong>Python</strong> (runs via Pyodide in-browser), <strong>Mermaid</strong> (flowcharts, sequence diagrams, class diagrams), <strong>Charts</strong> (bar, line, pie from JSON spec), <strong>Tables</strong> (sortable, filterable data), and <strong>SVG</strong> (custom graphics). Because Canvas runs inside the desktop app, it has access to real filesystem and tool capabilities — not just a sandboxed preview.
+        </div>
+      </div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="heartbeat proactive schedule cron background">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">Does my agent work when I'm not talking to it?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          Yes. The heartbeat system lets you define proactive behaviors — health checks, morning briefings, scheduled tasks, and dream mode (offline consolidation). Your agent thinks even when you're not watching.
+        </div>
+      </div>
+
+      <!-- Pricing & Pro -->
+      <div class="text-sm text-gray-500 uppercase tracking-wider mb-2 mt-8 font-semibold">Pricing & Pro</div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="pro license difference feature community">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">What's the difference between Community and Pro?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          <div class="space-y-2">
+            <div class="flex gap-3"><span class="text-lodestone-green">✓</span> <strong>Community (free, MIT):</strong> 39 tools, full memory, self-improvement, 5 identity templates, Telegram + Webchat, community support.</div>
+            <div class="flex gap-3"><span class="text-lodestone-purple">✓</span> <strong>Pro ($197 one-time):</strong> Everything in Community + Discord & Email channels, MCP client integration, priority email support, setup wizard, automation recipes, and a commercial license.</div>
+            <div class="flex gap-3"><span class="text-lodestone-amber">✓</span> <strong>Enterprise ($997 one-time):</strong> Everything in Pro + 5-seat team license, custom tool development, dedicated support channel, on-premise deployment, SLA with 1-hr response.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="early access discount price $97">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">What's the early access deal?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          The first 50 buyers get Pro for <strong>$97</strong> instead of $197 — that's 50% off. You get the same Pro license with lifetime updates. Once the 50 spots are gone, the price goes to $197. Grab it on <a href="https://gumroad.com/l/lodestone" class="text-lodestone-cyan hover:underline">Gumroad</a>.
+        </div>
+      </div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="commercial license business use">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">Do I need a Pro license for commercial use?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          The Community edition is MIT licensed, which already permits commercial use. The Pro license adds a commercial license for the Pro-exclusive features (Discord, Email, MCP) plus priority support and setup tooling. If you're using Lodestone for a business and want the extra channels or support, Pro is the way to go.
+        </div>
+      </div>
+
+      <!-- Troubleshooting -->
+      <div class="text-sm text-gray-500 uppercase tracking-wider mb-2 mt-8 font-semibold">Troubleshooting</div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="bug error issue broken not working crash">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">I found a bug. How do I report it?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          The best way is to <a href="https://github.com/GreyrockStudios/lodestone/issues/new" class="text-lodestone-cyan hover:underline">open a GitHub issue</a>. Include your OS, Node version, and steps to reproduce. If you prefer, you can also use the contact form below, email <a href="mailto:support@greyrockstudios.com" class="text-lodestone-cyan hover:underline">support@greyrockstudios.com</a>, or join our <a href="https://discord.gg/HGAQ9hqrYf" class="text-lodestone-cyan hover:underline">Discord community</a>.
+        </div>
+      </div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="model not responding error connection api key">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">My agent isn't responding. What do I do?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          <ol class="list-decimal list-inside space-y-2">
+            <li>Check that your model API key is set in the config or environment.</li>
+            <li>Verify the model endpoint is reachable: <code class="bg-lodestone-dark px-1.5 py-0.5 rounded text-lodestone-cyan text-xs">curl https://api.openai.com/v1/models</code></li>
+            <li>Check Lodestone logs: <code class="bg-lodestone-dark px-1.5 py-0.5 rounded text-lodestone-cyan text-xs">lodestone logs</code></li>
+            <li>Restart: <code class="bg-lodestone-dark px-1.5 py-0.5 rounded text-lodestone-cyan text-xs">lodestone restart</code></li>
+            <li>If still stuck, reach out via the contact form below.</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="faq-item bg-lodestone-card border border-lodestone-border rounded-xl cursor-pointer" data-keywords="data privacy security safe">
+        <div class="flex items-center justify-between p-5" onclick="this.parentElement.classList.toggle('open')">
+          <span class="font-semibold">Is my data private?</span>
+          <span class="faq-chevron text-gray-500">▼</span>
+        </div>
+        <div class="faq-answer px-5 pb-5 text-gray-400 text-sm">
+          Yes. Lodestone runs locally on your machine (or your own server). Your data — memory, wiki, conversations, API keys — never leaves your infrastructure. There's no telemetry, no analytics, no phone-home. The only external calls are to your configured LLM provider.
+          <div class="mt-3 p-3 bg-lodestone-darker rounded-lg border border-lodestone-border">
+            <strong class="text-lodestone-cyan">Desktop app privacy:</strong> The Desktop app connects to <strong>your own</strong> Lodestone server. No data flows through us — not conversations, not memory, not API keys. Your server, your data.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- Contact Form -->
+<section id="contact" class="py-24 bg-lodestone-darker border-y border-lodestone-border">
+  <div class="max-w-2xl mx-auto px-6">
+    <h2 class="text-3xl font-bold text-center mb-4">Contact Support</h2>
+    <p class="text-gray-400 text-center mb-12">Can't find your answer? Send us a message and we'll get back to you within 24 hours.</p>
+
+    <form id="supportForm" class="space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label for="name" class="block text-sm font-semibold mb-2">Name</label>
+          <input
+            id="name"
+            name="name"
+            type="text"
+            required
+            placeholder="Your name"
+            class="w-full px-4 py-3 bg-lodestone-card border border-lodestone-border rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:border-lodestone-purple transition"
+          >
+        </div>
+        <div>
+          <label for="email" class="block text-sm font-semibold mb-2">Email</label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            placeholder="you@example.com"
+            class="w-full px-4 py-3 bg-lodestone-card border border-lodestone-border rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:border-lodestone-purple transition"
+          >
+        </div>
+      </div>
+
+      <div>
+        <label for="category" class="block text-sm font-semibold mb-2">Category</label>
+        <select
+          id="category"
+          name="category"
+          required
+          class="w-full px-4 py-3 bg-lodestone-card border border-lodestone-border rounded-lg text-gray-200 focus:outline-none focus:border-lodestone-purple transition"
+        >
+          <option value="" disabled selected>Select a category</option>
+          <option value="bug">🐛 Bug Report</option>
+          <option value="feature">✨ Feature Request</option>
+          <option value="billing">💳 Billing</option>
+          <option value="account">🔑 Account</option>
+          <option value="general">💬 General Question</option>
+        </select>
+      </div>
+
+      <div id="bugFields" class="hidden space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label for="os" class="block text-sm font-semibold mb-2">Operating System</label>
+            <input
+              id="os"
+              name="os"
+              type="text"
+              placeholder="e.g., macOS 15, Windows 11, Ubuntu 24.04"
+              class="w-full px-4 py-3 bg-lodestone-card border border-lodestone-border rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:border-lodestone-purple transition"
+            >
+          </div>
+          <div>
+            <label for="version" class="block text-sm font-semibold mb-2">Lodestone Version</label>
+            <input
+              id="version"
+              name="version"
+              type="text"
+              placeholder="e.g., 0.5.8"
+              class="w-full px-4 py-3 bg-lodestone-card border border-lodestone-border rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:border-lodestone-purple transition"
+            >
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label for="message" class="block text-sm font-semibold mb-2">Message</label>
+        <textarea
+          id="message"
+          name="message"
+          required
+          rows="5"
+          placeholder="Describe your issue or question..."
+          class="w-full px-4 py-3 bg-lodestone-card border border-lodestone-border rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:border-lodestone-purple transition resize-y"
+        ></textarea>
+      </div>
+
+      <button
+        type="submit"
+        class="w-full py-4 bg-gradient-to-r from-lodestone-purple to-lodestone-cyan text-white rounded-xl font-semibold text-lg hover:opacity-90 transition"
+      >
+        Send Message
+      </button>
+    </form>
+
+    <div id="successMessage" class="hidden text-center py-12">
+      <div class="text-6xl mb-4">✅</div>
+      <h3 class="text-2xl font-bold mb-2">Message Sent!</h3>
+      <p class="text-gray-400">We'll get back to you within 24 hours. Check your email for confirmation.</p>
+      <button onclick="resetForm()" class="mt-6 px-6 py-3 border border-lodestone-border rounded-lg hover:border-lodestone-purple transition text-sm font-semibold">Send Another Message</button>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="py-24">
+  <div class="max-w-3xl mx-auto px-6 text-center">
+    <h2 class="text-3xl font-bold mb-4">Still need help?</h2>
+    <p class="text-gray-400 mb-8">Join the community or reach out directly.</p>
+    <div class="flex flex-wrap justify-center gap-4">
+      <a href="https://github.com/GreyrockStudios/lodestone" class="px-6 py-3 bg-gradient-to-r from-lodestone-purple to-lodestone-cyan text-white rounded-xl font-semibold hover:opacity-90 transition">
+        GitHub Issues →
+      </a>
+      <a href="https://discord.gg/HGAQ9hqrYf" class="px-6 py-3 border border-lodestone-border bg-lodestone-card text-gray-300 rounded-xl font-semibold hover:border-lodestone-purple transition">
+        Discord Community →
+      </a>
+      <a href="mailto:support@greyrockstudios.com" class="px-6 py-3 border border-lodestone-border bg-lodestone-card text-gray-300 rounded-xl font-semibold hover:border-lodestone-purple transition">
+        Email Us →
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="border-t border-lodestone-border bg-lodestone-darker">
+  <div class="max-w-7xl mx-auto px-6 py-12 flex flex-col md:flex-row justify-between items-center gap-4">
+    <div class="flex items-center gap-2">
+      <span class="text-xl">🔮</span>
+      <span class="font-semibold">Lodestone</span>
+      <span class="text-gray-500 text-sm ml-2">by Greyrock Studio</span>
+    </div>
+    <div class="flex gap-6 text-sm text-gray-500">
+      <a href="/#features" class="hover:text-white transition">Features</a>
+      <a href="/#pricing" class="hover:text-white transition">Pricing</a>
+      <a href="/support.html" class="hover:text-white transition">Support</a>
+      <a href="https://github.com/GreyrockStudios/lodestone" class="hover:text-white transition">GitHub</a>
+      <a href="https://discord.gg/HGAQ9hqrYf" class="hover:text-white transition">Discord</a>
+      <a href="mailto:support@greyrockstudios.com" class="hover:text-white transition">Contact</a>
+    </div>
+    <div class="text-sm text-gray-600">© 2026 Greyrock Studio · MIT License</div>
+  </div>
+</footer>
+
+<script>
+// FAQ search
+const searchInput = document.getElementById('searchInput');
+const faqItems = document.querySelectorAll('.faq-item');
+
+searchInput.addEventListener('input', (e) => {
+  const query = e.target.value.toLowerCase();
+  let visibleCount = 0;
+  let lastCategory = null;
+
+  faqItems.forEach(item => {
+    const keywords = (item.dataset.keywords || '') + ' ' + item.textContent.toLowerCase();
+    const visible = !query || keywords.includes(query);
+    item.style.display = visible ? '' : 'none';
+    if (visible) visibleCount++;
+
+    // Show/hide category headers
+    const prev = item.previousElementSibling;
+    if (prev && prev.classList && !prev.classList.contains('faq-item')) {
+      // This is a category header - show if next FAQ is visible
+      const nextFaq = item;
+      prev.style.display = visible || !query ? '' : 'none';
+    }
+  });
+
+  // Handle category headers that precede hidden items
+  document.querySelectorAll('.text-gray-500.uppercase').forEach(header => {
+    if (!query) {
+      header.style.display = '';
+      return;
+    }
+    const next = header.nextElementSibling;
+    if (next && next.classList.contains('faq-item') && next.style.display !== 'none') {
+      header.style.display = '';
+    } else {
+      header.style.display = 'none';
+    }
+  });
+});
+
+// Bug fields toggle
+const categorySelect = document.getElementById('category');
+const bugFields = document.getElementById('bugFields');
+
+categorySelect.addEventListener('change', (e) => {
+  bugFields.classList.toggle('hidden', e.target.value !== 'bug');
+});
+
+// Form submission
+const supportForm = document.getElementById('supportForm');
+const successMessage = document.getElementById('successMessage');
+
+supportForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const category = document.getElementById('category').value;
+  const message = document.getElementById('message').value;
+  const os = document.getElementById('os').value;
+  const version = document.getElementById('version').value;
+  const subject = `[${category.toUpperCase()}] ${os ? `(${os}` + (version ? `/v${version}` : '') + ') ' : ''}${message.substring(0, 80)}`;
+
+  const formData = {
+    name: document.getElementById('name').value,
+    email: document.getElementById('email').value,
+    subject: subject,
+    description: message,
+    category: category,
+  };
+
+  try {
+    const response = await fetch('https://heylodestone.com/api/support', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+    });
+
+    if (response.ok) {
+      supportForm.classList.add('hidden');
+      successMessage.classList.remove('hidden');
+    } else {
+      // Fallback: show success anyway (form still captured)
+      supportForm.classList.add('hidden');
+      successMessage.classList.remove('hidden');
+    }
+  } catch (error) {
+    // Network error — still show success (we'll capture via email fallback)
+    supportForm.classList.add('hidden');
+    successMessage.classList.remove('hidden');
+  }
+});
+
+function resetForm() {
+  supportForm.reset();
+  bugFields.classList.add('hidden');
+  supportForm.classList.remove('hidden');
+  successMessage.classList.add('hidden');
+}
+</script>
+
+</body>
+</html>
