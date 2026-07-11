@@ -22,16 +22,16 @@ jobs:
       - run: npx electron-builder --mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload macOS build
-        uses: actions/upload-artifact@v4
+      - name: Upload macOS to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: mac-build
-          path: |
+          tag: v0.5.49
+          files: |
             dist/*.dmg
             dist/*.blockmap
             dist/latest-mac.yml
-          retention-days: 5
-        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
   build-win:
     runs-on: windows-latest
@@ -49,13 +49,13 @@ jobs:
       - run: npx electron-builder --win --arm64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload Windows build
-        uses: actions/upload-artifact@v4
+      - name: Upload Windows to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: win-build
-          path: |
+          tag: v0.5.49
+          files: |
             dist/*.exe
             dist/*.blockmap
             dist/latest.yml
-          retention-days: 5
-        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
