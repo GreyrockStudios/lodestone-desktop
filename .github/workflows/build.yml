@@ -51,11 +51,22 @@ jobs:
           fi
           echo "Building version: $VERSION"
 
-  # ── Pull UI from production ─────────────────────────────────────────
-  pull-ui:
-    runs-on: ubuntu-latest
+  # ── Build macOS ────────────────────────────────────────────────────
+  build-mac:
+    needs: [version]
+    runs-on: macos-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.build_mac == 'true' || startsWith(github.ref, 'refs/tags/v')
     steps:
-      - name: Download production UI
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Pull UI from production
         run: |
           mkdir -p ui/assets
           curl -sfL https://heylodestone.com/ -o ui/index.html
@@ -87,34 +98,6 @@ jobs:
           echo "Downloaded $FILE_COUNT UI files"
           [ "$FILE_COUNT" -gt 5 ] || { echo "Too few UI files downloaded ($FILE_COUNT)"; exit 1; }
 
-      - name: Upload UI artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-assets
-          path: ui/
-          retention-days: 1
-
-  # ── Build macOS ────────────────────────────────────────────────────
-  build-mac:
-    needs: [version, pull-ui]
-    runs-on: macos-latest
-    if: github.event_name == 'workflow_dispatch' && inputs.build_mac == 'true' || startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Download UI assets
-        uses: actions/download-artifact@v4
-        with:
-          name: ui-assets
-          path: ui/
-
       - name: Install dependencies
         run: npm ci
 
@@ -124,7 +107,7 @@ jobs:
       - name: Build macOS (arm64 DMG, unsigned)
         run: npx electron-builder --mac
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: *** secrets.GITHUB_TOKEN }}
 
       - name: Deploy macOS to server
         uses: appleboy/scp-action@v0.1.7
@@ -136,7 +119,7 @@ jobs:
           target: /var/www/lodestone/updates
           strip_components: 1
 
-      - name: Copy DMG to downloads
+      - name: Copy DMG and fix permissions
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -147,9 +130,9 @@ jobs:
             find /var/www/lodestone/ -type d -exec chmod 755 {} \;
             find /var/www/lodestone/ -type f -exec chmod 644 {} \;
 
-  # ── Build Windows (x64 + arm64) ────────────────────────────────────
+  # ── Build Windows ──────────────────────────────────────────────────
   build-win:
-    needs: [version, pull-ui]
+    needs: [version]
     runs-on: windows-latest
     if: github.event_name == 'workflow_dispatch' && inputs.build_win == 'true' || startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -162,11 +145,38 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: Download UI assets
-        uses: actions/download-artifact@v4
-        with:
-          name: ui-assets
-          path: ui/
+      - name: Pull UI from production
+        shell: bash
+        run: |
+          mkdir -p ui/assets
+          curl -sfL https://heylodestone.com/ -o ui/index.html
+          curl -sfL https://heylodestone.com/support.html -o ui/support.html || true
+          curl -sfL https://heylodestone.com/manifest.json -o ui/manifest.json || true
+          curl -sfL https://heylodestone.com/og-image.png -o ui/og-image.png || true
+          curl -sfL https://heylodestone.com/favicon.ico -o ui/favicon.ico || true
+          curl -sfL https://heylodestone.com/icon.png -o ui/icon.png || true
+          grep -oE 'assets/[A-Za-z0-9_.-]+' ui/index.html | sort -u | while read -r asset; do
+            curl -sfL "https://heylodestone.com/$asset" -o "ui/$asset" || true
+          done
+          MAIN_JS=$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' ui/index.html | head -1 || true)
+          if [ -n "$MAIN_JS" ]; then
+            curl -sfL "https://heylodestone.com/$MAIN_JS" -o "ui/$MAIN_JS" || true
+            grep -oE 'assets/[A-Za-z0-9_.-]+\.(js|css)' "ui/$MAIN_JS" 2>/dev/null | sort -u | while read -r chunk; do
+              [ -f "ui/$chunk" ] || curl -sfL "https://heylodestone.com/$chunk" -o "ui/$chunk" || true
+            done
+            grep -oE 'assets/[A-Za-z0-9_.-]+\.(woff2?|ttf)' "ui/$MAIN_JS" 2>/dev/null | sort -u | while read -r font; do
+              [ -f "ui/$font" ] || curl -sfL "https://heylodestone.com/$font" -o "ui/$font" || true
+            done
+          fi
+          for css in ui/assets/*.css; do
+            [ -f "$css" ] || continue
+            grep -oE 'assets/[A-Za-z0-9_.-]+\.(woff2?|ttf|png|svg)' "$css" 2>/dev/null | sort -u | while read -r asset; do
+              [ -f "ui/$asset" ] || curl -sfL "https://heylodestone.com/$asset" -o "ui/$asset" || true
+            done
+          done
+          FILE_COUNT=$(find ui/ -type f | wc -l | tr -d ' ')
+          echo "Downloaded $FILE_COUNT UI files"
+          [ "$FILE_COUNT" -gt 5 ] || { echo "Too few UI files downloaded ($FILE_COUNT)"; exit 1; }
 
       - name: Install dependencies
         run: npm ci
@@ -177,12 +187,12 @@ jobs:
       - name: Build Windows x64 (unsigned)
         run: npx electron-builder --win --x64
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: *** secrets.GITHUB_TOKEN }}
 
       - name: Build Windows arm64 (unsigned)
         run: npx electron-builder --win --arm64
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: *** secrets.GITHUB_TOKEN }}
 
       - name: Deploy Windows to server
         uses: appleboy/scp-action@v0.1.7
@@ -210,26 +220,30 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download builds from server
+      - name: Download release files from server
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            ls -la /var/www/lodestone/updates/*.dmg /var/www/lodestone/updates/*.exe /var/www/lodestone/updates/*.yml 2>/dev/null || true
+            mkdir -p /tmp/release-assets
+            cp /var/www/lodestone/updates/latest-mac.yml /tmp/release-assets/
+            cp /var/www/lodestone/updates/latest.yml /tmp/release-assets/
+            cp /var/www/lodestone/updates/*.dmg /tmp/release-assets/ 2>/dev/null || true
+            cp /var/www/lodestone/updates/*.exe /tmp/release-assets/ 2>/dev/null || true
+            cp /var/www/lodestone/updates/*.blockmap /tmp/release-assets/ 2>/dev/null || true
+            ls -la /tmp/release-assets/
 
-      - name: Download files from server
-        run: |
-          mkdir -p release-assets
-          scp -o StrictHostKeyChecking=no -i <(echo "${{ secrets.SERVER_SSH_KEY }}") ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/*.dmg release-assets/ 2>/dev/null || true
-          scp -o StrictHostKeyChecking=no -i <(echo "${{ secrets.SERVER_SSH_KEY }}") ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/*.exe release-assets/ 2>/dev/null || true
-          scp -o StrictHostKeyChecking=no -i <(echo "${{ secrets.SERVER_SSH_KEY }}") ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/latest-mac.yml release-assets/ 2>/dev/null || true
-          scp -o StrictHostKeyChecking=no -i <(echo "${{ secrets.SERVER_SSH_KEY }}") ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/latest.yml release-assets/ 2>/dev/null || true
-          ls -la release-assets/
+      - name: Fetch release files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "/tmp/release-assets/*"
+          target: release-assets
+          strip_components: 1
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -238,4 +252,4 @@ jobs:
           files: release-assets/*
           generate_release_notes: true
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: *** secrets.RELEASE_TOKEN }}
