@@ -64,9 +64,11 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SERVER_SSH_KEY_B64 }}" | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" dist/latest-mac.yml dist/*.dmg dist/*.blockmap ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/
-          ssh -i ~/.ssh/deploy_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "cp /var/www/lodestone/updates/*.dmg /var/www/lodestone/downloads/ 2>/dev/null || true; find /var/www/lodestone/ -type d -exec chmod 755 {} \; ; find /var/www/lodestone/ -type f -exec chmod 644 {} \;"
+          rsync -avz -e "ssh" dist/latest-mac.yml dist/*.dmg dist/*.blockmap ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "cp /var/www/lodestone/updates/*.dmg /var/www/lodestone/downloads/ 2>/dev/null || true; find /var/www/lodestone/ -type d -exec chmod 755 {} \; ; find /var/www/lodestone/ -type f -exec chmod 644 {} \;"
       - name: Upload artifacts for release job
         uses: actions/upload-artifact@v4
         with:
@@ -102,9 +104,11 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SERVER_SSH_KEY_B64 }}" | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" dist/latest.yml dist/*.exe dist/*.blockmap ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/
-          ssh -i ~/.ssh/deploy_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "find /var/www/lodestone/ -type d -exec chmod 755 {} \; ; find /var/www/lodestone/ -type f -exec chmod 644 {} \;"
+          rsync -avz -e "ssh" dist/latest.yml dist/*.exe dist/*.blockmap ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "find /var/www/lodestone/ -type d -exec chmod 755 {} \; ; find /var/www/lodestone/ -type f -exec chmod 644 {} \;"
       - name: Upload artifacts for release job
         uses: actions/upload-artifact@v4
         with:
