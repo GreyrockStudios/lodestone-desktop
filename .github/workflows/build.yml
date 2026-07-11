@@ -107,7 +107,7 @@ jobs:
           eval "$(ssh-agent -s)"
           ssh-add ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
-          rsync -avz -e "ssh" dist/latest.yml dist/*.exe dist/*.blockmap ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/
+          scp dist/latest.yml dist/*.exe dist/*.blockmap ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/
           ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "find /var/www/lodestone/ -type d -exec chmod 755 {} \; ; find /var/www/lodestone/ -type f -exec chmod 644 {} \;"
       - name: Upload artifacts for release job
         uses: actions/upload-artifact@v4
