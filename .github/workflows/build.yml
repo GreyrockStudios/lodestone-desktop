@@ -26,16 +26,13 @@ env:
   NODE_VERSION: '20'
 
 jobs:
-  # ── Determine version ──────────────────────────────────────────────
   version:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.ver.outputs.version }}
       is_prerelease: ${{ steps.ver.outputs.is_prerelease }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Extract version
         id: ver
         run: |
@@ -44,40 +41,33 @@ jobs:
             VERSION=$(jq -r .version package.json)
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          if [[ "$VERSION" == *"alpha"* || "$VERSION" == *"beta"* || "$VERSION" == *"rc"* ]]; then
-            echo "is_prerelease=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_prerelease=false" >> $GITHUB_OUTPUT
-          fi
+          echo "is_prerelease=$([[ "$VERSION" == *"alpha"* || "$VERSION" == *"beta"* || "$VERSION" == *"rc"* ]] && echo true || echo false)" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
-  # ── Build macOS ────────────────────────────────────────────────────
   build-mac:
     needs: [version]
     runs-on: macos-latest
     if: github.event_name == 'workflow_dispatch' && inputs.build_mac == 'true' || startsWith(github.ref, 'refs/tags/v')
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Rebuild native modules for Electron
-        run: npx @electron/rebuild -v 43.1.0 -w better-sqlite3
-
-      - name: Build macOS (arm64 DMG, unsigned)
-        run: npx electron-builder --mac
+      - run: npm ci
+      - run: npx @electron/rebuild -v 43.1.0 -w better-sqlite3
+      - run: npx electron-builder --mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload macOS build artifact
+      - name: Setup SSH and deploy macOS
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" dist/latest-mac.yml dist/*.dmg dist/*.blockmap ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/
+          ssh -i ~/.ssh/deploy_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "cp /var/www/lodestone/updates/*.dmg /var/www/lodestone/downloads/ 2>/dev/null || true; find /var/www/lodestone/ -type d -exec chmod 755 {} \; ; find /var/www/lodestone/ -type f -exec chmod 644 {} \;"
+      - name: Upload artifacts for release job
         uses: actions/upload-artifact@v4
         with:
           name: mac-build
@@ -86,39 +76,36 @@ jobs:
             dist/*.blockmap
             dist/latest-mac.yml
           retention-days: 1
+        continue-on-error: true
 
-  # ── Build Windows ──────────────────────────────────────────────────
   build-win:
     needs: [version]
     runs-on: windows-latest
     if: github.event_name == 'workflow_dispatch' && inputs.build_win == 'true' || startsWith(github.ref, 'refs/tags/v')
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Rebuild native modules for Electron
-        run: npx @electron/rebuild -v 43.1.0 -w better-sqlite3
-
-      - name: Build Windows x64 (unsigned)
-        run: npx electron-builder --win --x64
+      - run: npm ci
+      - run: npx @electron/rebuild -v 43.1.0 -w better-sqlite3
+      - run: npx electron-builder --win --x64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build Windows arm64 (unsigned)
-        run: npx electron-builder --win --arm64
+      - run: npx electron-builder --win --arm64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Windows build artifact
+      - name: Setup SSH and deploy Windows
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" dist/latest.yml dist/*.exe dist/*.blockmap ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/
+          ssh -i ~/.ssh/deploy_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "find /var/www/lodestone/ -type d -exec chmod 755 {} \; ; find /var/www/lodestone/ -type f -exec chmod 644 {} \;"
+      - name: Upload artifacts for release job
         uses: actions/upload-artifact@v4
         with:
           name: win-build
@@ -127,41 +114,17 @@ jobs:
             dist/*.blockmap
             dist/latest.yml
           retention-days: 1
+        continue-on-error: true
 
-  # ── Deploy & Release ──────────────────────────────────────────────
-  deploy:
+  release:
     needs: [version, build-mac, build-win]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
+      - uses: actions/checkout@v4
       - name: Download all artifacts
         uses: actions/download-artifact@v4
-
-      - name: Setup SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: Deploy macOS to server
-        run: |
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" mac-build/latest-mac.yml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" mac-build/*.dmg ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" mac-build/*.blockmap ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/
-          # Copy DMG to downloads directory
-          ssh -i ~/.ssh/deploy_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "cp /var/www/lodestone/updates/*.dmg /var/www/lodestone/downloads/ 2>/dev/null || true"
-
-      - name: Deploy Windows to server
-        run: |
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" win-build/latest.yml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" win-build/*.exe ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" win-build/*.blockmap ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/lodestone/updates/
-
-      - name: Fix permissions
-        run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "find /var/www/lodestone/ -type d -exec chmod 755 {} \; && find /var/www/lodestone/ -type f -exec chmod 644 {} \;"
-
+        continue-on-error: true
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
