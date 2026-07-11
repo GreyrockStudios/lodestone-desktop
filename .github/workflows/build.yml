@@ -107,7 +107,7 @@ jobs:
       - name: Build macOS (arm64 DMG, unsigned)
         run: npx electron-builder --mac
         env:
-          GH_TOKEN: *** secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy macOS to server
         uses: appleboy/scp-action@v0.1.7
@@ -187,12 +187,12 @@ jobs:
       - name: Build Windows x64 (unsigned)
         run: npx electron-builder --win --x64
         env:
-          GH_TOKEN: *** secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Windows arm64 (unsigned)
         run: npx electron-builder --win --arm64
         env:
-          GH_TOKEN: *** secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy Windows to server
         uses: appleboy/scp-action@v0.1.7
@@ -252,4 +252,4 @@ jobs:
           files: release-assets/*
           generate_release_notes: true
         env:
-          GITHUB_TOKEN: *** secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
