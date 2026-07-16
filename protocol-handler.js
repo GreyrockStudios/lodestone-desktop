@@ -142,10 +142,11 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
 
     // ─── Static asset requests: serve from local ui/ directory ───
     if (isAssetRequest || hasFileExtension) {
-      // Use forward slashes — path.resolve handles them on all platforms including Windows.
-      // Do NOT convert to backslashes: on Windows, \assets\foo resolves as an absolute
-      // path from the drive root (C:\assets\foo) instead of relative to UI_DIR.
-      const localPath = path.resolve(UI_DIR, parsedUrl.pathname);
+      // Strip the leading slash from pathname so path.resolve treats it as relative.
+      // Without this, path.resolve(UI_DIR, '/assets/foo.js') returns '/assets/foo.js' (absolute)
+      // instead of 'UI_DIR/assets/foo.js' — on ALL platforms, not just Windows.
+      const relativePath = parsedUrl.pathname.startsWith('/') ? parsedUrl.pathname.slice(1) : parsedUrl.pathname;
+      const localPath = path.resolve(UI_DIR, relativePath);
       // Prevent path traversal: resolved path must be within UI_DIR
       // Use case-insensitive comparison on Windows and normalize separators
       const normalizedLocal = path.normalize(localPath).toLowerCase();
