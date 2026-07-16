@@ -532,12 +532,14 @@ const LodestoneStorage = {
       if (!['http:', 'https:'].includes(parsed.protocol)) {
         throw new Error(`Invalid protocol: ${parsed.protocol}`);
       }
+      // Block private/host patterns that could be SSRF vectors
       if (parsed.hostname === '0.0.0.0' || parsed.hostname === '') {
         throw new Error('Invalid hostname');
       }
       localStorage.setItem(LodestoneConfig.OLLAMA_URL_KEY, url);
     } catch (e) {
       console.error(`[storage] Invalid Ollama URL rejected: ${url}`, e.message);
+      // Fall back to default
       localStorage.setItem(LodestoneConfig.OLLAMA_URL_KEY, LodestoneConfig.DEFAULT_OLLAMA_URL);
     }
   },
@@ -2604,10 +2606,8 @@ function LodestoneFetchOverride(ctx) {
   // Use a getter so that if token-refresh.js wraps fetch later (adding 401
   // retry logic), the data layer picks up the wrapped version instead of
   // staying stuck on the original native fetch captured at load time.
-  // We read from __original_fetch (set by us or by token-refresh.js) or
-  // fall back to window.fetch — but never the data layer's own handleFetch.
   // To avoid infinite recursion, we stash the pre-override fetch in
-  // __pre_data_layer_fetch and always reference that.
+  // _preDataLayerFetch and always reference that as fallback.
   const _preDataLayerFetch = (window.__original_fetch || window.fetch).bind(window);
   window.__original_fetch = _preDataLayerFetch;
   const ctx = {
@@ -2638,7 +2638,16 @@ function LodestoneFetchOverride(ctx) {
   // ─── Ollama model listing ──────────────────────────────────────────────
   window.electronAPI = window.electronAPI || {};
   window.electronAPI.getOllamaModels = async function() {
-    const ollamaUrl = localStorage.getItem('lodestone_ollama_url') || 'http://localhost:11434';
+    const rawUrl = localStorage.getItem('lodestone_ollama_url') || 'http://localhost:11434';
+    let ollamaUrl;
+    try {
+      const parsed = new URL(rawUrl);
+      if (['http:', 'https:'].includes(parsed.protocol) && parsed.hostname !== '0.0.0.0' && parsed.hostname !== '') {
+        ollamaUrl = rawUrl;
+      } else {
+        ollamaUrl = 'http://localhost:11434';
+      }
+    } catch { ollamaUrl = 'http://localhost:11434'; }
     try {
       const res = await ctx.originalFetch(`${ollamaUrl}/api/tags`);
       if (res.ok) {
