@@ -75,7 +75,13 @@ const electronAPI = {
     getStats: () => ipcRenderer.invoke("db:get-stats"),
     exportAll: () => ipcRenderer.invoke("db:export-all"),
     importAll: (data) => ipcRenderer.invoke("db:import-all", data),
-    getDbPath: () => ipcRenderer.invoke("db:get-db-path"),
+    getDbPath: () =>> ipcRenderer.invoke("db:get-db-path"),
+  },
+
+  // ─── Audit Log (local tool call history) ──────────────────────────────────
+  audit: {
+    getLog: (opts) => ipcRenderer.invoke("get-audit-log", opts),
+    getStats: () => ipcRenderer.invoke("get-audit-stats"),
   },
 
   // ─── Generic Desktop Tool Executor ──────────────────────────────────────
