@@ -16,9 +16,13 @@ class MCPServer {
     this.tools = tools
     this.clients = []
     this.server = null
+    this.port = null
   }
 
-  start(port = 9515) {
+  start(startPort = 9515) {
+    const maxAttempts = 4
+    const maxPort = startPort + maxAttempts - 1
+    let attempt = 0
     this.server = net.createServer((socket) => {
       let buffer = ''
       socket.on('data', (data) => {
@@ -45,26 +49,35 @@ class MCPServer {
 
     const tryListen = (p) => {
       this.server.listen(p, '127.0.0.1', () => {
+        this.port = p
         console.log(`[MCP] Server listening on 127.0.0.1:${p}`)
       })
     }
 
     this.server.on('error', (err) => {
       if (err.code === 'EADDRINUSE') {
-        if (port < 9530) {
-          console.log(`[MCP] Port ${port} in use, trying ${port + 1}...`)
-          port++
-          tryListen(port)
+        attempt++
+        const nextPort = startPort + attempt
+        if (attempt < maxAttempts) {
+          console.log(`[MCP] Port ${nextPort - 1} already in use, trying ${nextPort}...`)
+          tryListen(nextPort)
         } else {
-          console.error(`[MCP] Could not find available port after 9515-9530`)
+          console.error(`[MCP] Could not find available port (tried ${startPort}-${maxPort}). All MCP server ports are in use.`)
+          this.server.close()
           this.server = null
         }
       } else {
         console.error(`[MCP] Server error:`, err)
+        this.server.close()
+        this.server = null
       }
     })
 
-    tryListen(port)
+    tryListen(startPort)
+  }
+
+  getPort() {
+    return this.port
   }
 
   stop() {
@@ -406,6 +419,9 @@ function initMCP(tools) {
 
   // IPC: List connections
   ipcMain.handle('mcp:list-connections', () => mcpClient.getConnections())
+
+  // IPC: Get MCP server port (useful when server fell back to alternate port)
+  ipcMain.handle('mcp:get-server-port', () => mcpServer?.getPort() ?? null)
 
   // IPC: Get bundled + marketplace server catalog
   ipcMain.handle('mcp:get-servers', () => getAllServers())

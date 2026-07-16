@@ -264,6 +264,7 @@ const electronAPI = {
     callTool: (serverName, toolName, args) => ipcRenderer.invoke("mcp:call-tool", serverName, toolName, args),
     listTools: () => ipcRenderer.invoke("mcp:list-tools"),
     listConnections: () => ipcRenderer.invoke("mcp:list-connections"),
+    getServerPort: () => ipcRenderer.invoke("mcp:get-server-port"),
   },
 };
 

@@ -526,7 +526,20 @@ const LodestoneStorage = {
     return localStorage.getItem(LodestoneConfig.OLLAMA_URL_KEY) || null;
   },
   setOllamaUrl(url) {
-    localStorage.setItem(LodestoneConfig.OLLAMA_URL_KEY, url);
+    // Validate URL format before storing
+    try {
+      const parsed = new URL(url);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error(`Invalid protocol: ${parsed.protocol}`);
+      }
+      if (parsed.hostname === '0.0.0.0' || parsed.hostname === '') {
+        throw new Error('Invalid hostname');
+      }
+      localStorage.setItem(LodestoneConfig.OLLAMA_URL_KEY, url);
+    } catch (e) {
+      console.error(`[storage] Invalid Ollama URL rejected: ${url}`, e.message);
+      localStorage.setItem(LodestoneConfig.OLLAMA_URL_KEY, LodestoneConfig.DEFAULT_OLLAMA_URL);
+    }
   },
   getOllamaModel() {
     return localStorage.getItem(LodestoneConfig.LOCAL_MODEL_KEY) || null;
@@ -2587,12 +2600,26 @@ function LodestoneFetchOverride(ctx) {
   if (!isDesktop) return;
 
   // ─── Context shared across all modules ─────────────────────────────────
+  // Capture the best available fetch before we override window.fetch.
+  // Use a getter so that if token-refresh.js wraps fetch later (adding 401
+  // retry logic), the data layer picks up the wrapped version instead of
+  // staying stuck on the original native fetch captured at load time.
+  // We read from __original_fetch (set by us or by token-refresh.js) or
+  // fall back to window.fetch — but never the data layer's own handleFetch.
+  // To avoid infinite recursion, we stash the pre-override fetch in
+  // __pre_data_layer_fetch and always reference that.
+  const _preDataLayerFetch = (window.__original_fetch || window.fetch).bind(window);
+  window.__original_fetch = _preDataLayerFetch;
   const ctx = {
     currentTier: null,
     syncEnabled: false,
-    originalFetch: (window.__original_fetch || window.fetch).bind(window),
+    get originalFetch() {
+      // Always resolve dynamically: if token-refresh.js or another module
+      // has updated __original_fetch to a better wrapper, use that;
+      // otherwise fall back to the fetch we captured before our override.
+      return window.__original_fetch || _preDataLayerFetch;
+    },
   };
-  window.__original_fetch = ctx.originalFetch;
 
   // ─── Initialize modules ────────────────────────────────────────────────
   // Each module receives ctx and attaches its methods for cross-module access.

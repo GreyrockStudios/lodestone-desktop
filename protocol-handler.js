@@ -142,9 +142,10 @@ function createProtocolHandler({ fetchWithNode, fetchWithNodeStreaming, DESKTOP_
 
     // ─── Static asset requests: serve from local ui/ directory ───
     if (isAssetRequest || hasFileExtension) {
-      // Normalize the URL path to OS-specific separators for proper path resolution
-      const normalizedPath = parsedUrl.pathname.replace(/\//g, path.sep);
-      const localPath = path.resolve(UI_DIR, normalizedPath);
+      // Use forward slashes — path.resolve handles them on all platforms including Windows.
+      // Do NOT convert to backslashes: on Windows, \assets\foo resolves as an absolute
+      // path from the drive root (C:\assets\foo) instead of relative to UI_DIR.
+      const localPath = path.resolve(UI_DIR, parsedUrl.pathname);
       // Prevent path traversal: resolved path must be within UI_DIR
       // Use case-insensitive comparison on Windows and normalize separators
       const normalizedLocal = path.normalize(localPath).toLowerCase();
