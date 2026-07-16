@@ -22,9 +22,14 @@ jobs:
       - run: npx electron-builder --mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: List dist contents
+        run: ls -la dist/ || true
       - name: Upload macOS build to release
         run: |
-          gh release upload v0.5.52 dist/*.dmg dist/*.blockmap dist/latest-mac.yml --clobber || true
+          TAG=$(echo "${{ github.ref }}" | sed 's/refs\/tags\///')
+          echo "Uploading to release $TAG"
+          ls -la dist/*.dmg dist/*.blockmap dist/latest-mac.yml 2>&1 || true
+          gh release upload "$TAG" dist/*.dmg dist/*.blockmap dist/latest-mac.yml --clobber
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
@@ -44,9 +49,15 @@ jobs:
       - run: npx electron-builder --win --arm64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: List dist contents
+        shell: bash
+        run: ls -la dist/ || true
       - name: Upload Windows build to release
         shell: bash
         run: |
-          gh release upload v0.5.52 dist/*.exe dist/*.blockmap dist/latest.yml --clobber || true
+          TAG=$(echo "${{ github.ref }}" | sed 's/refs\/tags\///')
+          echo "Uploading to release $TAG"
+          ls -la dist/*.exe dist/*.blockmap dist/latest.yml 2>&1 || true
+          gh release upload "$TAG" dist/*.exe dist/*.blockmap dist/latest.yml --clobber
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
