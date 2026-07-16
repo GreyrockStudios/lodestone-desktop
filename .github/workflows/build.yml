@@ -8,6 +8,9 @@ on:
 env:
   NODE_VERSION: '20'
 
+permissions:
+  contents: write
+
 jobs:
   build-mac:
     runs-on: macos-latest
@@ -26,12 +29,12 @@ jobs:
         run: ls -la dist/ || true
       - name: Upload macOS build to release
         run: |
-          TAG=$(echo "${{ github.ref }}" | sed 's/refs\/tags\///')
+          TAG=${GITHUB_REF#refs/tags/}
           echo "Uploading to release $TAG"
           ls -la dist/*.dmg dist/*.blockmap dist/latest-mac.yml 2>&1 || true
           gh release upload "$TAG" dist/*.dmg dist/*.blockmap dist/latest-mac.yml --clobber
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-win:
     runs-on: windows-latest
@@ -55,9 +58,9 @@ jobs:
       - name: Upload Windows build to release
         shell: bash
         run: |
-          TAG=$(echo "${{ github.ref }}" | sed 's/refs\/tags\///')
+          TAG=${GITHUB_REF#refs/tags/}
           echo "Uploading to release $TAG"
           ls -la dist/*.exe dist/*.blockmap dist/latest.yml 2>&1 || true
           gh release upload "$TAG" dist/*.exe dist/*.blockmap dist/latest.yml --clobber
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
